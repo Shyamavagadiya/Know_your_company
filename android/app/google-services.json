@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "9874797301",
+    "project_id": "know-your-company-b2720",
+    "storage_bucket": "know-your-company-b2720.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:9874797301:android:b7d7585a060f0e64f04bbc",
+        "android_client_info": {
+          "package_name": "com.example.hcd_project2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6kqMPgVkcC4STLid4QHWotFPoCYV1nTM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
