@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 
 class StudentDashboard extends StatelessWidget {
-  const StudentDashboard({Key? key}) : super(key: key);
+  const StudentDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {

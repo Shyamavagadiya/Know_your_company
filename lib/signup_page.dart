@@ -3,7 +3,7 @@ import 'package:hcd_project2/auth_service.dart';
 import 'package:hcd_project2/login_page.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   _SignupScreenState createState() => _SignupScreenState();

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 
 class HODDashboard extends StatelessWidget {
-  const HODDashboard({Key? key}) : super(key: key);
+  const HODDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {

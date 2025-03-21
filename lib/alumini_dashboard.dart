@@ -4,7 +4,7 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
 
 class AlumniDashboard extends StatelessWidget {
-  const AlumniDashboard({Key? key}) : super(key: key);
+  const AlumniDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {

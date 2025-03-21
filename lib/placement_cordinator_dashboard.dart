@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 class PlacementCoordinatorDashboard extends StatelessWidget {
   final EmailParsingService _emailParsingService = EmailParsingService();
 
+  PlacementCoordinatorDashboard({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
