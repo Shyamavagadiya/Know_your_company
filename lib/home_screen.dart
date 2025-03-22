@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
           case 'faculty':
             return const FacultyDashboard();
           case 'hod':
-            return const HODDashboard();
+            return const HodDashboard();
           case 'placement_coordinator':
             return  PlacementCoordinatorDashboard();
           case 'alumni':

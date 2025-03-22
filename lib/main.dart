@@ -4,6 +4,7 @@ import 'package:hcd_project2/firebase_options.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/landing_page.dart';
+import 'package:hcd_project2/alumini_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        home: const LandingPage(),
+        home: const AlumniDashboard(),
       ),
     );
   }
