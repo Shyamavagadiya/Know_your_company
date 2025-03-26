@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/email_parsing_service.dart';
-import 'package:provider/provider.dart';
 
 class PlacementCoordinatorDashboard extends StatelessWidget {
   final EmailParsingService _emailParsingService = EmailParsingService();
