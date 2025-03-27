@@ -1,4 +1,3 @@
-// screens/auth/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/auth_service.dart';
 import 'package:hcd_project2/login_page.dart';

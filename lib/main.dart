@@ -1,17 +1,8 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:hcd_project2/login_page.dart';
-import 'package:hcd_project2/firebase_options.dart';
-import 'package:hcd_project2/user_provider.dart';
-import 'package:provider/provider.dart';
+import 'gmail_screen.dart';
 
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // This line is crucial
-  );
-  runApp(MyApp());
+void main() {
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -19,17 +10,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-      ],
-      child: MaterialApp(
-        title: 'Placement Management',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
-        home: const LoginScreen(),
+    return MaterialApp(
+      title: 'Flutter Gmail App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.system,
+      home: const GmailScreen(),
     );
   }
 }

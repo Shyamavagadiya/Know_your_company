@@ -38,6 +38,12 @@ dependencies:
   firebase_auth: ^5.5.1
   cloud_firestore: ^5.6.5
   provider: ^6.1.2
+  google_sign_in: ^6.1.0
+  googleapis: ^11.0.0
+  googleapis_auth: ^1.4.0
+  url_launcher: ^6.1.11
+  http: ^1.1.0
+  
 
 dev_dependencies:
   flutter_test:
@@ -49,13 +55,14 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
+  
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
