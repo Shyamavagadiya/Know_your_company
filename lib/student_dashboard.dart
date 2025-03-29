@@ -1,10 +1,11 @@
+// screens/dashboard/student_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
 
 
 class StudentDashboard extends StatelessWidget {
-  const StudentDashboard({Key? key}) : super(key: key);
+  const StudentDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {

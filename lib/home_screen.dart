@@ -11,7 +11,7 @@ import 'package:provider/provider.dart';
 
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
           case 'faculty':
             return const FacultyDashboard();
           case 'hod':
-            return const HODDashboard();
+            return const HodDashboard();
           case 'placement_coordinator':
             return  PlacementCoordinatorDashboard();
           case 'alumni':

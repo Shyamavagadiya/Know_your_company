@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hcd_project2/email_parsing_service.dart';
-import 'package:provider/provider.dart';
 
 class PlacementCoordinatorDashboard extends StatelessWidget {
-  final EmailParsingService _emailParsingService = EmailParsingService();
+  PlacementCoordinatorDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,9 +12,10 @@ class PlacementCoordinatorDashboard extends StatelessWidget {
       body: Center(
         child: ElevatedButton(
           onPressed: () async {
-            await _emailParsingService.parseNewEmails();
+            // Placeholder action instead of parsing emails
+            // You can replace this with any new functionality you need
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Emails processed successfully')),
+              const SnackBar(content: Text('Functionality not implemented')),
             );
           },
           child: const Text('Process Emails'),
