@@ -21,10 +21,13 @@ class EmailMessage {
 }
 
 class GmailService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
-    clientId: '551246493102-tq3ln8pnfdj9tk689vunbilruigkj5ro.apps.googleusercontent.com',
-  );
+  // Modify your GmailService class to handle platforms differently
+final GoogleSignIn _googleSignIn = GoogleSignIn(
+  scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+  clientId: kIsWeb 
+      ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
+      : null, // Let it use the default for Android
+);
 
   Future<bool> isSignedIn() async {
     return await _googleSignIn.isSignedIn();
