@@ -15,8 +15,8 @@ class FacultyDashboard extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color.fromARGB(255, 167, 82, 3),
-                  const Color.fromARGB(255, 167, 82, 3),
+                  const Color.fromARGB(255, 0, 166, 190),
+                  const Color.fromARGB(255, 0, 166, 190),
                 ],
               ),
             ),
@@ -89,7 +89,7 @@ class FacultyDashboard extends StatelessWidget {
         onPressed: () {
           // Handle reminder button press
         },
-        backgroundColor: Color.fromARGB(255, 167, 82, 3),
+        backgroundColor: Color.fromARGB(255, 0, 166, 190),
         mini: true,
         child: const Icon(Icons.notifications, color: Colors.white),
       ),
@@ -104,7 +104,7 @@ class FacultyDashboard extends StatelessWidget {
       onPressed: () {
         // Handle profile button press (e.g., navigate to profile screen)
       },
-      icon: const Icon(Icons.person, color: Color.fromARGB(255, 167, 82, 3)),
+      icon: const Icon(Icons.person, color: Color.fromARGB(255, 0, 166, 190)),
     ),
   ),
 ),
@@ -121,7 +121,7 @@ class FacultyDashboard extends StatelessWidget {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 15),
-          backgroundColor: const Color.fromARGB(255, 167, 82, 3),
+          backgroundColor: const Color.fromARGB(255, 0, 166, 190),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Row(

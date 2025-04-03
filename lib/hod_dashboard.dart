@@ -15,8 +15,8 @@ class HodDashboard extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color.fromARGB(255, 233, 107, 69),
-                  const Color.fromARGB(255, 233, 107, 69),
+                  const Color.fromARGB(255,56,142,60),
+                  const Color.fromARGB(255, 56,142,60),
                 ],
               ),
             ),
@@ -88,7 +88,7 @@ class HodDashboard extends StatelessWidget {
         onPressed: () {
           // Handle reminder button press
         },
-        backgroundColor: Color.fromARGB(255, 233, 107, 69),
+        backgroundColor: Color.fromARGB(255, 56,142,60),
         mini: true,
         child: const Icon(Icons.notifications, color: Colors.white),
       ),
@@ -103,7 +103,7 @@ class HodDashboard extends StatelessWidget {
       onPressed: () {
         // Handle profile button press (e.g., navigate to profile screen)
       },
-      icon: const Icon(Icons.person, color: Color.fromARGB(255, 233, 107, 69)),
+      icon: const Icon(Icons.person, color: Color.fromARGB(255, 56,142,60)),
     ),
   ),
 ),
@@ -120,7 +120,7 @@ class HodDashboard extends StatelessWidget {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 15),
-          backgroundColor: const Color.fromARGB(255, 233, 107, 69),
+          backgroundColor: const Color.fromARGB(255,56,142,60),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Row(

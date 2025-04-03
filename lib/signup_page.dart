@@ -69,7 +69,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green[50],
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -81,7 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
+                  color: const Color.fromARGB(255,  0, 166, 190),
                 ),
               ),
               const SizedBox(height: 20),
@@ -109,7 +109,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Full Name',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person, color: Colors.green),
+                          prefixIcon: Icon(Icons.person, color: Color.fromARGB(255,  0, 166, 190)),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -124,7 +124,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Email',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email, color: Colors.green),
+                          prefixIcon: Icon(Icons.email, color: Color.fromARGB(255,  0, 166, 190)),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -143,7 +143,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Password',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.lock, color: Colors.green),
+                          prefixIcon: Icon(Icons.lock, color: Color.fromARGB(255,  0, 166, 190)),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -162,7 +162,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Confirm Password',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.lock_outline, color: Colors.green),
+                          prefixIcon: Icon(Icons.lock_outline, color: Color.fromARGB(255, 0, 166, 190)),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -180,7 +180,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Role',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.badge, color: Colors.green),
+                          prefixIcon: Icon(Icons.badge, color: Color.fromARGB(255,  0, 166, 190)),
                         ),
                         value: _selectedRole,
                         items: _roles.map((role) {
@@ -200,7 +200,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green[700],
+                            backgroundColor: const Color.fromARGB(255,  0, 166, 190),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -229,7 +229,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 },
                 child: const Text(
                   "Already have an account? Login",
-                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Color.fromARGB(255,  0, 166, 190), fontWeight: FontWeight.bold),
               ),
               ),
             ],

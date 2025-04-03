@@ -5,13 +5,14 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
+import 'package:hcd_project2/faculty_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // This line is crucial
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -24,6 +25,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         title: 'Placement Management',
         theme: ThemeData(
           primarySwatch: Colors.blue,

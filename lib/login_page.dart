@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green[50], // Light green background
+      backgroundColor: Colors.white, // Light green background
       body: Stack(
         children: [
           // Main content
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green[700],
+                        color: const Color.fromARGB(255,  0, 166, 190),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              prefixIcon: const Icon(Icons.email, color: Colors.green),
+                              prefixIcon: const Icon(Icons.email, color: Color.fromARGB(255, 0, 166, 190)),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              prefixIcon: const Icon(Icons.lock, color: Colors.green),
+                              prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255,  0, 166, 190)),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -131,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: double.infinity,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[700],
+                                backgroundColor: const Color.fromARGB(255, 0, 166, 190),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         "Don't have an account? Sign Up",
                         style: TextStyle(
-                          color: Colors.green,
+                          color: Color.fromARGB(255,  0, 166, 190),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   MaterialPageRoute(builder: (_) => const LandingPage()),
                 );
               },
-              backgroundColor: Colors.green, // Background of FAB remains green
+              backgroundColor: const Color.fromARGB(255,  0, 166, 190), // Background of FAB remains green
               child: const Icon(Icons.home, color: Colors.white), // Button is now white
             ),
           ),
