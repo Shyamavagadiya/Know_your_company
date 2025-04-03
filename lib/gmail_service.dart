@@ -21,8 +21,7 @@ class EmailMessage {
 }
 
 class GmailService {
-  // Modify your GmailService class to handle platforms differently
-final GoogleSignIn _googleSignIn = GoogleSignIn(
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
   scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
   clientId: kIsWeb 
       ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
