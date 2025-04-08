@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/gmail_service.dart';
 import 'package:hcd_project2/login_page.dart';
+import 'package:hcd_project2/firebase_email_service.dart';
 
 class GmailScreen extends StatefulWidget {
   final List<EmailMessage>? initialEmails;
@@ -13,11 +14,14 @@ class GmailScreen extends StatefulWidget {
 
 class _GmailScreenState extends State<GmailScreen> {
   final GmailService _gmailService = GmailService();
+  final FirebaseEmailService _firebaseEmailService = FirebaseEmailService();
   bool _isSignedIn = false;
   bool _isLoading = false;
+  bool _isSaving = false;
   List<EmailMessage> _emails = [];
   String? _errorMessage;
   String? _filterEmail;
+  String? _saveMessage;
 
   @override
   void initState() {
@@ -87,6 +91,54 @@ class _GmailScreenState extends State<GmailScreen> {
     }
   }
 
+  /// Saves filtered emails from shyama.vu3whg@gmail.com to Firebase
+  Future<void> _saveFilteredEmailsToFirebase() async {
+    if (_emails.isEmpty) {
+      setState(() {
+        _saveMessage = 'No emails to save';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _saveMessage = null;
+    });
+
+    try {
+      await _firebaseEmailService.saveEmailsFromTargetSender(_emails);
+      setState(() {
+        _saveMessage = 'Emails saved successfully to Firebase';
+      });
+      
+      // Show a success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_saveMessage!),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _saveMessage = 'Failed to save emails: $e';
+      });
+      
+      // Show an error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_saveMessage!),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,6 +149,15 @@ class _GmailScreenState extends State<GmailScreen> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () => _fetchEmails(),
+            ),
+          if (_isSignedIn && _filterEmail == 'shyama.vu3whg@gmail.com')
+            IconButton(
+              icon: _isSaving 
+                ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                : const Icon(Icons.save),
+              onPressed: _isSaving 
+                ? null 
+                : _saveFilteredEmailsToFirebase,
             ),
           IconButton(
             icon: Icon(_isSignedIn ? Icons.logout : Icons.login),
