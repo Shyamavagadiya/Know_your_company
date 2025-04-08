@@ -27,6 +27,7 @@ class GmailService {
   clientId: kIsWeb 
       ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
       : null, // Let it use the default for Android
+  
 );
 
   Future<bool> isSignedIn() async {
@@ -72,9 +73,25 @@ class GmailService {
     }
   }
 
-  Future<List<EmailMessage>> fetchEmails() async {
+  Future<List<EmailMessage>> fetchEmails({String? filterEmail}) async {
     try {
-      final googleUser = await _googleSignIn.signInSilently();
+      // When filtering emails, we need to ensure we have proper authentication
+      // For web platform, we might need to re-authenticate when filtering
+      GoogleSignInAccount? googleUser;
+      
+      if (filterEmail != null && kIsWeb) {
+        // For filtering on web, try to get a fresh authentication
+        try {
+          googleUser = await _googleSignIn.signIn();
+        } catch (e) {
+          // If explicit sign-in fails, try silent sign-in as fallback
+          googleUser = await _googleSignIn.signInSilently();
+        }
+      } else {
+        // Regular flow for non-filtering or mobile
+        googleUser = await _googleSignIn.signInSilently();
+      }
+      
       if (googleUser == null) {
         throw Exception("User not signed in");
       }
@@ -107,7 +124,7 @@ class GmailService {
       final response = await gmailApi.users.messages.list(
         'me',
         maxResults: 20,
-        q: 'in:inbox',
+        q: filterEmail != null ? 'in:inbox from:$filterEmail' : 'in:inbox',
       );
 
       final List<EmailMessage> emails = [];

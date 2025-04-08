@@ -17,6 +17,7 @@ class _GmailScreenState extends State<GmailScreen> {
   bool _isLoading = false;
   List<EmailMessage> _emails = [];
   String? _errorMessage;
+  String? _filterEmail;
 
   @override
   void initState() {
@@ -52,22 +53,32 @@ class _GmailScreenState extends State<GmailScreen> {
     }
   }
 
-  Future<void> _fetchEmails() async {
+  Future<void> _fetchEmails({String? specificEmail}) async {
     if (!_isSignedIn) return;
     
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      if (specificEmail != null) {
+        _filterEmail = specificEmail;
+      }
     });
     
     try {
-      final emails = await _gmailService.fetchEmails();
+      // For web platform, handle potential OAuth errors when filtering emails
+      final emails = await _gmailService.fetchEmails(filterEmail: _filterEmail);
       setState(() {
         _emails = emails;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = "Failed to fetch emails: $e";
+        // Check if the error is related to OAuth origin not registered
+        if (e.toString().contains("origin isn't registered") || 
+            e.toString().contains("localhost can't continue")) {
+          _errorMessage = "Authentication error: The current origin (localhost) isn't registered with Google OAuth client. Please configure your Google Cloud Console project to add localhost as an authorized JavaScript origin.";
+        } else {
+          _errorMessage = "Failed to fetch emails: $e";
+        }
       });
     } finally {
       setState(() {
@@ -85,7 +96,7 @@ class _GmailScreenState extends State<GmailScreen> {
           if (_isSignedIn)
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: _fetchEmails,
+              onPressed: () => _fetchEmails(),
             ),
           IconButton(
             icon: Icon(_isSignedIn ? Icons.logout : Icons.login),
@@ -93,6 +104,39 @@ class _GmailScreenState extends State<GmailScreen> {
           ),
         ],
       ),
+      floatingActionButton: _isSignedIn ? FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Filter Options'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    title: Text('All Emails'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _filterEmail = null;
+                      });
+                      _fetchEmails();
+                    },
+                  ),
+                  ListTile(
+                    title: Text('Emails from shyama.vu3whg@gmail.com'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _fetchEmails(specificEmail: 'shyama.vu3whg@gmail.com');
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        child: Icon(Icons.filter_list),
+      ) : null,
       body: _buildBody(),
     );
   }
