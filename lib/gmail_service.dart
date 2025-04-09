@@ -4,6 +4,8 @@ import 'package:googleapis/gmail/v1.dart' as gmail;
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 class EmailMessage {
   final String id;
   final String subject;
@@ -30,6 +32,14 @@ class GmailService {
   
 );
 
+  // Secure storage for persisting tokens
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  
+  // Keys for storing tokens
+  static const String _accessTokenKey = 'gmail_access_token';
+  static const String _accessTokenExpiryKey = 'gmail_token_expiry';
+  static const String _refreshTokenKey = 'gmail_refresh_token';
+
   Future<bool> isSignedIn() async {
     return await _googleSignIn.isSignedIn();
   }
@@ -37,6 +47,12 @@ class GmailService {
   Future<bool> signIn() async {
     try {
       GoogleSignInAccount? googleUser;
+      
+      // Try to use stored tokens first
+      if (await _hasValidStoredToken()) {
+        print("Using stored token for authentication");
+        return true;
+      }
       
       if (kIsWeb) {
         // Try silently first
@@ -56,6 +72,9 @@ class GmailService {
         return false;
       }
       
+      // Store authentication tokens
+      await _storeAuthTokens(googleUser);
+      
       print("Google Sign-In successful: ${googleUser.email}");
       return true;
     } catch (error) {
@@ -63,11 +82,86 @@ class GmailService {
       return false;
     }
   }
+  
+  // Store authentication tokens securely
+  Future<void> _storeAuthTokens(GoogleSignInAccount googleUser) async {
+    try {
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final expiryTime = DateTime.now().toUtc().add(Duration(hours: 1));
+      
+      if (accessToken != null) {
+        await _secureStorage.write(key: _accessTokenKey, value: accessToken);
+        await _secureStorage.write(key: _accessTokenExpiryKey, value: expiryTime.toIso8601String());
+        
+        // Store refresh token if available
+        if (googleAuth.idToken != null) {
+          await _secureStorage.write(key: _refreshTokenKey, value: googleAuth.idToken);
+        }
+      }
+    } catch (e) {
+      print("Error storing auth tokens: $e");
+    }
+  }
+  
+  // Check if we have a valid stored token
+  Future<bool> _hasValidStoredToken() async {
+    try {
+      final storedToken = await _secureStorage.read(key: _accessTokenKey);
+      final expiryString = await _secureStorage.read(key: _accessTokenExpiryKey);
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+      
+      if (storedToken == null || expiryString == null) {
+        return false;
+      }
+      
+      final expiry = DateTime.parse(expiryString);
+      final now = DateTime.now().toUtc();
+      
+      // If token is expired but we have a refresh token, try to refresh it
+      if (now.isAfter(expiry) && refreshToken != null && refreshToken.isNotEmpty) {
+        print("Token expired, attempting to refresh");
+        return await _refreshAccessToken(refreshToken);
+      }
+      
+      // Return true if token exists and is not expired
+      return storedToken.isNotEmpty && now.isBefore(expiry);
+    } catch (e) {
+      print("Error checking stored token: $e");
+      return false;
+    }
+  }
+  
+  // Refresh the access token using the refresh token
+  Future<bool> _refreshAccessToken(String refreshToken) async {
+    try {
+      // Try to use silent sign-in first as it's more reliable than manual refresh
+      final googleUser = await _googleSignIn.signInSilently();
+      
+      if (googleUser != null) {
+        await _storeAuthTokens(googleUser);
+        print("Successfully refreshed token via silent sign-in");
+        return true;
+      }
+      
+      print("Silent sign-in failed, token could not be refreshed");
+      return false;
+    } catch (e) {
+      print("Error refreshing token: $e");
+      return false;
+    }
+  }
 
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
-      print("User signed out.");
+      
+      // Clear stored tokens
+      await _secureStorage.delete(key: _accessTokenKey);
+      await _secureStorage.delete(key: _accessTokenExpiryKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+      
+      print("User signed out and tokens cleared.");
     } catch (error) {
       print("Sign-out error: $error");
     }
@@ -75,29 +169,38 @@ class GmailService {
 
   Future<List<EmailMessage>> fetchEmails({String? filterEmail}) async {
     try {
-      // When filtering emails, we need to ensure we have proper authentication
-      // For web platform, we might need to re-authenticate when filtering
-      GoogleSignInAccount? googleUser;
+      // Get access token - either from storage or by authenticating
+      String? accessToken;
+      DateTime tokenExpiry = DateTime.now().toUtc().add(Duration(hours: 1));
       
-      if (filterEmail != null && kIsWeb) {
-        // For filtering on web, try to get a fresh authentication
-        try {
-          googleUser = await _googleSignIn.signIn();
-        } catch (e) {
-          // If explicit sign-in fails, try silent sign-in as fallback
-          googleUser = await _googleSignIn.signInSilently();
+      // Check if we have a valid stored token first
+      if (await _hasValidStoredToken()) {
+        accessToken = await _secureStorage.read(key: _accessTokenKey);
+        final expiryString = await _secureStorage.read(key: _accessTokenExpiryKey);
+        if (expiryString != null) {
+          tokenExpiry = DateTime.parse(expiryString);
         }
       } else {
-        // Regular flow for non-filtering or mobile
-        googleUser = await _googleSignIn.signInSilently();
-      }
-      
-      if (googleUser == null) {
-        throw Exception("User not signed in");
-      }
+        // No valid stored token, need to authenticate
+        // Try silent sign-in first for all cases
+        GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently();
+        
+        // If silent sign-in fails, we need explicit sign-in
+        if (googleUser == null) {
+          print("Silent sign-in failed, attempting explicit sign-in");
+          googleUser = await _googleSignIn.signIn();
+          
+          if (googleUser == null) {
+            throw Exception("User not signed in");
+          }
+        }
 
-      final googleAuth = await googleUser.authentication;
-      final accessToken = googleAuth.accessToken;
+        final googleAuth = await googleUser.authentication;
+        accessToken = googleAuth.accessToken;
+        
+        // Store the new tokens
+        await _storeAuthTokens(googleUser);
+      }
 
       if (accessToken == null) {
         throw Exception("Access token is null");
@@ -108,7 +211,7 @@ class GmailService {
         AccessToken(
           'Bearer', 
           accessToken, 
-          DateTime.now().toUtc().add(Duration(hours: 1))
+          tokenExpiry
         ),
         null, // refreshToken
         ['https://www.googleapis.com/auth/gmail.readonly'],
