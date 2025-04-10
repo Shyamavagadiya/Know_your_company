@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/auth_service.dart';
 import 'package:hcd_project2/login_page.dart';
+import 'package:hcd_project2/gmail_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -16,8 +17,10 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final GmailService _gmailService = GmailService();
   String _selectedRole = 'student';
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   final List<String> _roles = [
     'student',
@@ -63,6 +66,38 @@ class _SignupScreenState extends State<SignupScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+  
+  Future<void> _handleGoogleSignUp() async {
+    setState(() {
+      _isGoogleLoading = true;
+    });
+    try {
+      final isSignedIn = await _gmailService.signIn();
+      if (isSignedIn) {
+        // Get the current Google user to extract email
+        final googleUser = await _gmailService.getCurrentUser();
+        if (googleUser != null) {
+          // Pre-fill the email field with the Google account email
+          setState(() {
+            _emailController.text = googleUser.email;
+          });
+          
+          // Show a message to the user to complete the signup form
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please complete your profile information to sign up')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google Sign-Up failed: ${e.toString()}')),
+      );
+    } finally {
+      setState(() {
+        _isGoogleLoading = false;
+      });
     }
   }
 
@@ -212,6 +247,42 @@ class _SignupScreenState extends State<SignupScreen> {
                               : const Text(
                                   'Sign Up',
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Google Sign-Up Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.grey.shade300),
+                            ),
+                          ),
+                          onPressed: _isGoogleLoading ? null : _handleGoogleSignUp,
+                          child: _isGoogleLoading
+                              ? const CircularProgressIndicator()
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/google_logo.png',
+                                      height: 24,
+                                      width: 24,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Sign up with Google',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                         ),
                       ),

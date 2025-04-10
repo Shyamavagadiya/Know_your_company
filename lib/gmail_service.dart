@@ -43,6 +43,10 @@ class GmailService {
   Future<bool> isSignedIn() async {
     return await _googleSignIn.isSignedIn();
   }
+  
+  Future<GoogleSignInAccount?> getCurrentUser() async {
+    return _googleSignIn.currentUser;
+  }
 
   Future<bool> signIn() async {
     try {
