@@ -4,7 +4,9 @@ import 'package:hcd_project2/login_page.dart';
 import 'package:hcd_project2/gmail_service.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final String? googleEmail;
+  
+  const SignupScreen({super.key, this.googleEmail});
 
   @override
   _SignupScreenState createState() => _SignupScreenState();
@@ -30,6 +32,15 @@ class _SignupScreenState extends State<SignupScreen> {
     'alumni',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill email field if provided from Google Sign-In
+    if (widget.googleEmail != null) {
+      _emailController.text = widget.googleEmail!;
+    }
+  }
+  
   @override
   void dispose() {
     _nameController.dispose();
@@ -88,9 +99,18 @@ class _SignupScreenState extends State<SignupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Please complete your profile information to sign up')),
           );
+          
+          // Sign out from Google to reset the authentication state
+          // This ensures the button will work on subsequent attempts
+          await _gmailService.signOut();
         }
+      } else {
+        // If sign-in was not successful, ensure we're signed out
+        await _gmailService.signOut();
       }
     } catch (e) {
+      // Sign out on error to reset the authentication state
+      await _gmailService.signOut();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Google Sign-Up failed: ${e.toString()}')),
       );

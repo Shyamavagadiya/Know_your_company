@@ -64,17 +64,46 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final isSignedIn = await _gmailService.signIn();
       if (isSignedIn) {
-        // Fetch emails immediately after successful sign-in
-        final emails = await _gmailService.fetchEmails();
+        // Get the current Google user to extract email
+        final googleUser = await _gmailService.getCurrentUser();
         
-        // Navigate to GmailScreen with fetched emails
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => GmailScreen(initialEmails: emails),
-          ),
-        );
+        if (googleUser != null) {
+          // Check if this Google account email already exists in Firebase
+          final userExists = await _authService.checkUserExistsByEmail(googleUser.email);
+          
+          if (userExists) {
+            // User exists, fetch emails and navigate to Gmail screen
+            final emails = await _gmailService.fetchEmails();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => GmailScreen(initialEmails: emails),
+              ),
+            );
+          } else {
+            // Sign out from Google before redirecting to signup
+            // This ensures the button will work on subsequent attempts
+            await _gmailService.signOut();
+            
+            // User doesn't exist, redirect to signup page with pre-filled email
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => SignupScreen(googleEmail: googleUser.email),
+              ),
+            );
+            
+            // Show a message to the user
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please complete your profile information to sign up')),
+            );
+          }
+        }
+      } else {
+        // If sign-in was not successful, ensure we're signed out
+        await _gmailService.signOut();
       }
     } catch (e) {
+      // Sign out on error to reset the authentication state
+      await _gmailService.signOut();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Google Sign-In failed: ${e.toString()}')),
       );
