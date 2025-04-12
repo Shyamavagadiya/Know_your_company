@@ -110,4 +110,23 @@ class AuthService {
       rethrow;
     }
   }
+  
+  // Get user document by email
+  Future<DocumentSnapshot?> getUserDocByEmail(String email) async {
+    try {
+      final QuerySnapshot result = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      
+      if (result.docs.isNotEmpty) {
+        return result.docs.first;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user document by email: $e');
+      return null;
+    }
+  }
 }

@@ -41,7 +41,19 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        
+        // Try to sign in to Gmail service if possible
+        bool gmailSignedIn = false;
+        try {
+          gmailSignedIn = await _gmailService.signIn();
+        } catch (e) {
+          print('Gmail sign-in failed during login: ${e.toString()}');
+          // Continue with login even if Gmail sign-in fails
+        }
+        
+        // Fetch current user which will also fetch emails if Gmail is signed in
         await Provider.of<UserProvider>(context, listen: false).fetchCurrentUser();
+        
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
@@ -72,13 +84,27 @@ class _LoginScreenState extends State<LoginScreen> {
           final userExists = await _authService.checkUserExistsByEmail(googleUser.email);
           
           if (userExists) {
-            // User exists, fetch emails and navigate to Gmail screen
+            // User exists, fetch emails for later use in dashboard
             final emails = await _gmailService.fetchEmails();
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => GmailScreen(initialEmails: emails),
-              ),
-            );
+            
+            // Get user role from Firebase based on email
+            final userDoc = await _authService.getUserDocByEmail(googleUser.email);
+            
+            if (userDoc != null) {
+              // Update UserProvider with the current user data
+              await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, emails);
+              
+              // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const HomeScreen()),
+              );
+            } else {
+              // If user document not found, show error
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('User data not found. Please try again.')),
+              );
+              await _gmailService.signOut();
+            }
           } else {
             // Sign out from Google before redirecting to signup
             // This ensures the button will work on subsequent attempts
