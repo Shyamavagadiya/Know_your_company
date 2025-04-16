@@ -7,6 +7,7 @@ import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/gmail_screen.dart'; // Add this import
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
   final GmailService _gmailService = GmailService(); // Initialize GmailService
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
 
@@ -29,6 +31,29 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // Add this method to show a dialog prompting the user to sign in with Gmail
+  Future<bool> _showGmailSignInDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Connect Gmail Account'),
+        content: const Text(
+          'Would you like to connect your Gmail account to view your emails in the app?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not Now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    ) ?? false; // Default to false if dialog is dismissed
   }
 
   Future<void> _login() async {
@@ -42,17 +67,47 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
         
-        // Try to sign in to Gmail service if possible
-        bool gmailSignedIn = false;
+        // After successful email/password login, we need to fetch emails
+        List<EmailMessage>? emails;
         try {
-          gmailSignedIn = await _gmailService.signIn();
+          // Check if already signed in with Gmail
+          if (await _gmailService.isSignedIn()) {
+            emails = await _gmailService.fetchEmails();
+            print('Successfully fetched ${emails.length} emails from existing Gmail session');
+          } else {
+            // If not signed in with Gmail, prompt user to sign in to fetch emails
+            bool shouldSignIn = await _showGmailSignInDialog();
+            if (shouldSignIn) {
+              // Sign in with Gmail
+              bool isSignedIn = await _gmailService.signIn();
+              if (isSignedIn) {
+                emails = await _gmailService.fetchEmails();
+                print('Successfully fetched ${emails.length} emails after Gmail sign-in');
+              }
+            }
+          }
         } catch (e) {
-          print('Gmail sign-in failed during login: ${e.toString()}');
-          // Continue with login even if Gmail sign-in fails
+          print('Gmail fetch failed during login: ${e.toString()}');
+          // Continue with login even if Gmail fetch fails
         }
         
-        // Fetch current user which will also fetch emails if Gmail is signed in
-        await Provider.of<UserProvider>(context, listen: false).fetchCurrentUser();
+        // Get user document to ensure we have the latest user data
+        final userDoc = await _firestore.collection('users')
+            .doc(_authService.getCurrentUser()?.uid)
+            .get();
+            
+        if (userDoc.exists) {
+          // If we have emails from Gmail, use setCurrentUserFromDoc to ensure emails are stored
+          if (emails != null) {
+            await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, emails);
+          } else {
+            // Otherwise use the regular fetchCurrentUser method
+            await Provider.of<UserProvider>(context, listen: false).fetchCurrentUser();
+          }
+        } else {
+          // If user document doesn't exist, just fetch current user
+          await Provider.of<UserProvider>(context, listen: false).fetchCurrentUser();
+        }
         
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -74,6 +129,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _isGoogleLoading = true;
     });
     try {
+      // First ensure we're signed out to reset the authentication state
+      // This fixes the issue with Google Sign-In not working on subsequent attempts
+      await _gmailService.signOut();
+      
       final isSignedIn = await _gmailService.signIn();
       if (isSignedIn) {
         // Get the current Google user to extract email

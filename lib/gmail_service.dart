@@ -158,6 +158,15 @@ class GmailService {
 
   Future<void> signOut() async {
     try {
+      // First disconnect to fully revoke access
+      try {
+        await _googleSignIn.disconnect();
+      } catch (e) {
+        // Ignore errors from disconnect as it might not be connected
+        print("Disconnect error (can be ignored): $e");
+      }
+      
+      // Then sign out to clear local state
       await _googleSignIn.signOut();
       
       // Clear stored tokens
