@@ -73,7 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
           // Check if already signed in with Gmail
           if (await _gmailService.isSignedIn()) {
             emails = await _gmailService.fetchEmails(
-              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
+              daysAgo: 30
             );
             print('Successfully fetched ${emails.length} filtered emails from existing Gmail session');
           } else {
@@ -84,7 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
               bool isSignedIn = await _gmailService.signIn();
               if (isSignedIn) {
                 emails = await _gmailService.fetchEmails(
-                  allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+                  allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
+                  daysAgo: 30
                 );
                 print('Successfully fetched ${emails.length} filtered emails after Gmail sign-in');
               }
@@ -150,7 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
             try {
               // User exists, fetch emails for later use in dashboard
               final emails = await _gmailService.fetchEmails(
-                allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+                allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
+                daysAgo: 30
               );
               
               // Get user role from Firebase based on email

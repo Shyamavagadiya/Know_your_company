@@ -32,7 +32,8 @@ class UserProvider with ChangeNotifier {
           if (await gmailService.isSignedIn()) {
             // Only show emails from specific senders
             _fetchedEmails = await gmailService.fetchEmails(
-              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
+              daysAgo: 30
             );
           }
         }

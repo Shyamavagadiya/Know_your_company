@@ -188,7 +188,7 @@ class GmailService {
     }
   }
 
-  Future<List<EmailMessage>> fetchEmails({String? filterEmail, List<String>? allowedSenders}) async {
+  Future<List<EmailMessage>> fetchEmails({String? filterEmail, List<String>? allowedSenders, int? daysAgo}) async {
     try {
       // Get access token - either from storage or by authenticating
       String? accessToken;
@@ -254,18 +254,27 @@ class GmailService {
       // Fetch messages
       String query = 'in:inbox';
       
+      // Calculate date for filtering (default to 30 days if not specified)
+      final int timeframeInDays = daysAgo ?? 30;
+      final DateTime cutoffDate = DateTime.now().subtract(Duration(days: timeframeInDays));
+      final String afterDate = cutoffDate.toIso8601String().split('T')[0]; // Format as YYYY-MM-DD
+      
       // Filter by specific email if provided
       if (filterEmail != null) {
-        query = 'in:inbox from:$filterEmail';
+        query = 'in:inbox from:$filterEmail after:$afterDate';
       }
       // Filter by list of allowed senders if provided
       else if (allowedSenders != null && allowedSenders.isNotEmpty) {
-        query = 'in:inbox (${allowedSenders.map((email) => 'from:$email').join(' OR ')})';
+        query = 'in:inbox (${allowedSenders.map((email) => 'from:$email').join(' OR ')}) after:$afterDate';
+      }
+      // Just filter by date if no sender filters
+      else {
+        query = 'in:inbox after:$afterDate';
       }
       
       final response = await gmailApi.users.messages.list(
         'me',
-        maxResults: 20,
+        maxResults: 100, // Increased from 20 to fetch more emails
         q: query,
       );
 
