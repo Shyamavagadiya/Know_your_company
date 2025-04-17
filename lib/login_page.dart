@@ -72,8 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
         try {
           // Check if already signed in with Gmail
           if (await _gmailService.isSignedIn()) {
-            emails = await _gmailService.fetchEmails();
-            print('Successfully fetched ${emails.length} emails from existing Gmail session');
+            emails = await _gmailService.fetchEmails(
+              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+            );
+            print('Successfully fetched ${emails.length} filtered emails from existing Gmail session');
           } else {
             // If not signed in with Gmail, prompt user to sign in to fetch emails
             bool shouldSignIn = await _showGmailSignInDialog();
@@ -81,8 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
               // Sign in with Gmail
               bool isSignedIn = await _gmailService.signIn();
               if (isSignedIn) {
-                emails = await _gmailService.fetchEmails();
-                print('Successfully fetched ${emails.length} emails after Gmail sign-in');
+                emails = await _gmailService.fetchEmails(
+                  allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+                );
+                print('Successfully fetched ${emails.length} filtered emails after Gmail sign-in');
               }
             }
           }
@@ -143,26 +147,51 @@ class _LoginScreenState extends State<LoginScreen> {
           final userExists = await _authService.checkUserExistsByEmail(googleUser.email);
           
           if (userExists) {
-            // User exists, fetch emails for later use in dashboard
-            final emails = await _gmailService.fetchEmails();
-            
-            // Get user role from Firebase based on email
-            final userDoc = await _authService.getUserDocByEmail(googleUser.email);
-            
-            if (userDoc != null) {
-              // Update UserProvider with the current user data
-              await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, emails);
+            try {
+              // User exists, fetch emails for later use in dashboard
+              final emails = await _gmailService.fetchEmails(
+                allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+              );
               
-              // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
-              );
-            } else {
-              // If user document not found, show error
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('User data not found. Please try again.')),
-              );
-              await _gmailService.signOut();
+              // Get user role from Firebase based on email
+              final userDoc = await _authService.getUserDocByEmail(googleUser.email);
+              
+              if (userDoc != null) {
+                // Update UserProvider with the current user data
+                await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, emails);
+                
+                // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                );
+              } else {
+                // If user document not found, show error
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('User data not found. Please try again.')),
+                );
+                await _gmailService.signOut();
+              }
+            } catch (emailError) {
+              // If fetching emails fails, we can still proceed with login
+              print('Failed to fetch emails during login: $emailError');
+              
+              // Get user role from Firebase based on email
+              final userDoc = await _authService.getUserDocByEmail(googleUser.email);
+              
+              if (userDoc != null) {
+                // Update UserProvider with the current user data (without emails)
+                await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, null);
+                
+                // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                );
+                
+                // Inform the user about the email issue
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Signed in successfully, but unable to fetch emails. You can try again later.')),
+                );
+              }
             }
           } else {
             // Sign out from Google before redirecting to signup

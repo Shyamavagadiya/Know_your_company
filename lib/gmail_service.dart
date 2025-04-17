@@ -25,7 +25,7 @@ class EmailMessage {
 class GmailService {
   //working on different platform 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-  scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+  scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://mail.google.com/'],
   clientId: kIsWeb 
       ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
       : null, // Let it use the default for Android
@@ -98,9 +98,11 @@ class GmailService {
         await _secureStorage.write(key: _accessTokenKey, value: accessToken);
         await _secureStorage.write(key: _accessTokenExpiryKey, value: expiryTime.toIso8601String());
         
-        // Store refresh token if available
-        if (googleAuth.idToken != null) {
-          await _secureStorage.write(key: _refreshTokenKey, value: googleAuth.idToken);
+        // Note: Google Sign-In doesn't provide a refresh token directly
+        // We store the serverAuthCode if available, which can be used in a server-side flow
+        // For client-only apps, we'll rely on silent sign-in for token refresh
+        if (googleUser.serverAuthCode != null) {
+          await _secureStorage.write(key: _refreshTokenKey, value: googleUser.serverAuthCode);
         }
       }
     } catch (e) {
@@ -148,7 +150,13 @@ class GmailService {
         return true;
       }
       
-      print("Silent sign-in failed, token could not be refreshed");
+      // If silent sign-in fails, try to use the server auth code if available
+      // Note: This would typically be used in a server-side flow
+      // For client-only apps, we might need to prompt the user to sign in again
+      print("Silent sign-in failed, attempting alternative refresh methods");
+      
+      // For client-side only apps, we need to prompt for interactive sign-in
+      // We'll return false here and let the calling code handle the re-authentication
       return false;
     } catch (e) {
       print("Error refreshing token: $e");
@@ -180,11 +188,12 @@ class GmailService {
     }
   }
 
-  Future<List<EmailMessage>> fetchEmails({String? filterEmail}) async {
+  Future<List<EmailMessage>> fetchEmails({String? filterEmail, List<String>? allowedSenders}) async {
     try {
       // Get access token - either from storage or by authenticating
       String? accessToken;
       DateTime tokenExpiry = DateTime.now().toUtc().add(Duration(hours: 1));
+      bool needsReauthentication = false;
       
       // Check if we have a valid stored token first
       if (await _hasValidStoredToken()) {
@@ -195,6 +204,11 @@ class GmailService {
         }
       } else {
         // No valid stored token, need to authenticate
+        needsReauthentication = true;
+      }
+      
+      // If we need to reauthenticate, try silent sign-in first
+      if (needsReauthentication) {
         // Try silent sign-in first for all cases
         GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently();
         
@@ -220,14 +234,15 @@ class GmailService {
       }
 
       // Create credentials with UTC DateTime
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
       final credentials = AccessCredentials(
         AccessToken(
           'Bearer', 
-          accessToken, 
+          accessToken!, 
           tokenExpiry
         ),
-        null, // refreshToken
-        ['https://www.googleapis.com/auth/gmail.readonly'],
+        refreshToken, // Include refresh token if available
+        ['https://www.googleapis.com/auth/gmail.readonly', 'https://mail.google.com/'],
       );
 
       // Create an authenticated HTTP client
@@ -237,10 +252,21 @@ class GmailService {
       final gmailApi = gmail.GmailApi(authClient);
 
       // Fetch messages
+      String query = 'in:inbox';
+      
+      // Filter by specific email if provided
+      if (filterEmail != null) {
+        query = 'in:inbox from:$filterEmail';
+      }
+      // Filter by list of allowed senders if provided
+      else if (allowedSenders != null && allowedSenders.isNotEmpty) {
+        query = 'in:inbox (${allowedSenders.map((email) => 'from:$email').join(' OR ')})';
+      }
+      
       final response = await gmailApi.users.messages.list(
         'me',
         maxResults: 20,
-        q: filterEmail != null ? 'in:inbox from:$filterEmail' : 'in:inbox',
+        q: query,
       );
 
       final List<EmailMessage> emails = [];

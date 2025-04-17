@@ -30,7 +30,10 @@ class UserProvider with ChangeNotifier {
           // Fetch emails for the user if they're authenticated
           final GmailService gmailService = GmailService();
           if (await gmailService.isSignedIn()) {
-            _fetchedEmails = await gmailService.fetchEmails();
+            // Only show emails from specific senders
+            _fetchedEmails = await gmailService.fetchEmails(
+              allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com']
+            );
           }
         }
       }

@@ -80,6 +80,16 @@ class _GmailScreenState extends State<GmailScreen> {
         if (e.toString().contains("origin isn't registered") || 
             e.toString().contains("localhost can't continue")) {
           _errorMessage = "Authentication error: The current origin (localhost) isn't registered with Google OAuth client. Please configure your Google Cloud Console project to add localhost as an authorized JavaScript origin.";
+        } else if (e.toString().contains("User not signed in") || 
+                 e.toString().contains("authentication required") ||
+                 e.toString().contains("token")) {
+          _errorMessage = "Authentication error: Your session has expired. Please sign in again.";
+          // Attempt to sign out and clear tokens to force a fresh sign-in
+          _gmailService.signOut().then((_) {
+            setState(() {
+              _isSignedIn = false;
+            });
+          });
         } else {
           _errorMessage = "Failed to fetch emails: $e";
         }
