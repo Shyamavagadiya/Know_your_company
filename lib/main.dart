@@ -7,6 +7,8 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
+import 'package:hcd_project2/home_screen.dart';
+import 'package:hcd_project2/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,14 +25,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (context) {
+          // Create and initialize the UserProvider
+          final provider = UserProvider();
+          // Initialize the auth state listener
+          provider.initAuthListener();
+          return provider;
+        }),
       ],
       child: MaterialApp(
         title: 'Placement Management',
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        home: LoginScreen(),
+        // Use SplashScreen as the initial screen to check auth state
+        home: SplashScreen(),
       ),
     );
   }

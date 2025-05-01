@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/gmail/v1.dart' as gmail;
 import 'package:googleapis_auth/auth_io.dart';
@@ -25,12 +26,11 @@ class EmailMessage {
 class GmailService {
   //working on different platform 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-  scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://mail.google.com/'],
-  clientId: kIsWeb 
-      ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
-      : null, // Let it use the default for Android
-  
-);
+    scopes: ['https://www.googleapis.com/auth/gmail.readonly', 'https://mail.google.com/'],
+    clientId: kIsWeb 
+        ? '9874797301-8l18k3qfog27di2rge6mubkoh0chr0g8.apps.googleusercontent.com'
+        : null, // Let it use the default for Android
+  );
 
   // Secure storage for persisting tokens
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -39,13 +39,35 @@ class GmailService {
   static const String _accessTokenKey = 'gmail_access_token';
   static const String _accessTokenExpiryKey = 'gmail_token_expiry';
   static const String _refreshTokenKey = 'gmail_refresh_token';
+  static const String _googleUserEmailKey = 'google_user_email';
 
   Future<bool> isSignedIn() async {
-    return await _googleSignIn.isSignedIn();
+    // First check if user is signed in to Firebase Auth
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return false;
+    }
+    
+    // Then check if user is signed in to Google
+    final isGoogleSignedIn = await _googleSignIn.isSignedIn();
+    if (isGoogleSignedIn) {
+      return true;
+    }
+    
+    // If not signed in to Google but we have valid stored tokens, consider as signed in
+    return await _hasValidStoredToken();
   }
   
   Future<GoogleSignInAccount?> getCurrentUser() async {
-    return _googleSignIn.currentUser;
+    // First try to get the current Google user
+    GoogleSignInAccount? googleUser = _googleSignIn.currentUser;
+    
+    // If not available, try silent sign-in
+    if (googleUser == null) {
+      googleUser = await _googleSignIn.signInSilently();
+    }
+    
+    return googleUser;
   }
 
   Future<bool> signIn() async {
@@ -104,6 +126,9 @@ class GmailService {
         if (googleUser.serverAuthCode != null) {
           await _secureStorage.write(key: _refreshTokenKey, value: googleUser.serverAuthCode);
         }
+        
+        // Store the Google user's email
+        await _secureStorage.write(key: _googleUserEmailKey, value: googleUser.email);
       }
     } catch (e) {
       print("Error storing auth tokens: $e");
@@ -181,6 +206,7 @@ class GmailService {
       await _secureStorage.delete(key: _accessTokenKey);
       await _secureStorage.delete(key: _accessTokenExpiryKey);
       await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: _googleUserEmailKey);
       
       print("User signed out and tokens cleared.");
     } catch (error) {

@@ -1,10 +1,21 @@
 // services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  // Constructor that sets persistence
+  AuthService() {
+    // Firebase Auth on web already uses LOCAL persistence by default
+    // For mobile platforms, this is also the default
+    // This ensures the user stays logged in even after app restart
+    if (!kIsWeb) {
+      _auth.setPersistence(Persistence.LOCAL);
+    }
+  }
   
   // Check if a user exists in Firestore by email
   Future<bool> checkUserExistsByEmail(String email) async {
@@ -127,6 +138,24 @@ class AuthService {
     } catch (e) {
       print('Error getting user document by email: $e');
       return null;
+    }
+  }
+  
+  // Check if a user account is linked to Google Sign-In
+  Future<bool> isGoogleLinkedAccount(String email) async {
+    try {
+      final userDoc = await getUserDocByEmail(email);
+      if (userDoc != null && userDoc.data() is Map<String, dynamic>) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        // Check if the account has a 'googleLinked' field set to true
+        // or if the 'authProvider' field is set to 'google'
+        return userData['googleLinked'] == true || 
+               userData['authProvider'] == 'google';
+      }
+      return false;
+    } catch (e) {
+      print('Error checking if account is Google-linked: $e');
+      return false;
     }
   }
 }

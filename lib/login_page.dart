@@ -8,6 +8,7 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/gmail_screen.dart'; // Add this import
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -62,6 +63,26 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
       try {
+        // First check if this email is linked to Google Sign-In
+        bool isGoogleLinked = await _authService.isGoogleLinkedAccount(_emailController.text.trim());
+        
+        if (isGoogleLinked) {
+          // Show a message that this account should use Google Sign-In
+          setState(() {
+            _isLoading = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This email is linked with Google. Please use Google Sign-In instead.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+        
+        // Proceed with email/password login if not Google-linked
         await _authService.signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
@@ -134,101 +155,258 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _isGoogleLoading = true;
     });
+    
     try {
-      // First ensure we're signed out to reset the authentication state
-      // This fixes the issue with Google Sign-In not working on subsequent attempts
-      await _gmailService.signOut();
-      
       final isSignedIn = await _gmailService.signIn();
-      if (isSignedIn) {
-        // Get the current Google user to extract email
-        final googleUser = await _gmailService.getCurrentUser();
+      
+      if (!isSignedIn) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google Sign-In failed. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Get current Google user
+      final googleUser = await _gmailService.getCurrentUser();
+      if (googleUser == null) {
+        throw Exception('Failed to get Google user after sign-in');
+      }
+      
+      // Get Google authentication
+      final googleAuth = await googleUser.authentication;
+      
+      // Create credential for Firebase Auth
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      
+      // Sign in to Firebase with the Google credential
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final firebaseUser = userCredential.user;
+      
+      if (firebaseUser == null) {
+        throw Exception('Failed to sign in to Firebase with Google credential');
+      }
+      
+      // Fetch emails from Gmail with filter for specific senders
+      final emails = await _gmailService.fetchEmails(
+        allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
+        daysAgo: 30
+      );
+      
+      // Check if user exists in Firestore
+      DocumentSnapshot? userDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      
+      if (userDoc.exists) {
+        // User exists, update their document to mark as Google-linked
+        await _firestore.collection('users').doc(firebaseUser.uid).update({
+          'googleLinked': true,
+          'authProvider': 'google',
+          'lastActive': FieldValue.serverTimestamp(),
+        });
         
-        if (googleUser != null) {
-          // Check if this Google account email already exists in Firebase
-          final userExists = await _authService.checkUserExistsByEmail(googleUser.email);
+        // Update UserProvider with user data and emails
+        await Provider.of<UserProvider>(context, listen: false)
+            .setCurrentUserFromDoc(userDoc, emails);
+        
+        // Navigate to HomeScreen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        // User doesn't exist, show registration form
+        // Show a dialog to collect additional information
+        final result = await showDialog<Map<String, String>>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildRegistrationDialog(googleUser.email),
+        );
+        
+        if (result != null) {
+          // Create new user in Firestore with the Firebase Auth UID
+          await _firestore.collection('users').doc(firebaseUser.uid).set({
+            'uid': firebaseUser.uid,
+            'email': googleUser.email,
+            'name': result['name'] ?? googleUser.displayName ?? '',
+            'role': result['role'] ?? 'student',
+            'profilePicture': googleUser.photoUrl ?? '',
+            'googleLinked': true,
+            'authProvider': 'google',
+            'fcmToken': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastActive': FieldValue.serverTimestamp(),
+          });
           
-          if (userExists) {
-            try {
-              // User exists, fetch emails for later use in dashboard
-              final emails = await _gmailService.fetchEmails(
-                allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
-                daysAgo: 30
-              );
-              
-              // Get user role from Firebase based on email
-              final userDoc = await _authService.getUserDocByEmail(googleUser.email);
-              
-              if (userDoc != null) {
-                // Update UserProvider with the current user data
-                await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, emails);
-                
-                // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                );
-              } else {
-                // If user document not found, show error
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('User data not found. Please try again.')),
-                );
-                await _gmailService.signOut();
-              }
-            } catch (emailError) {
-              // If fetching emails fails, we can still proceed with login
-              print('Failed to fetch emails during login: $emailError');
-              
-              // Get user role from Firebase based on email
-              final userDoc = await _authService.getUserDocByEmail(googleUser.email);
-              
-              if (userDoc != null) {
-                // Update UserProvider with the current user data (without emails)
-                await Provider.of<UserProvider>(context, listen: false).setCurrentUserFromDoc(userDoc, null);
-                
-                // Navigate to HomeScreen which will redirect to the appropriate dashboard based on role
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                );
-                
-                // Inform the user about the email issue
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Signed in successfully, but unable to fetch emails. You can try again later.')),
-                );
-              }
-            }
-          } else {
-            // Sign out from Google before redirecting to signup
-            // This ensures the button will work on subsequent attempts
-            await _gmailService.signOut();
+          // If role is student, create student document
+          if (result['role'] == 'student') {
+            await _firestore.collection('students').doc(firebaseUser.uid).set({
+              'uid': firebaseUser.uid,
+              'rollNumber': result['rollNumber'] ?? '',
+              'sem': int.tryParse(result['semester'] ?? '1') ?? 1,
+              'cgpa': 0.0,
+              'resume': '',
+              'skillset': [],
+              'placementStatus': 'not_placed',
+              'eligibilityCriteria': {
+                'cgpaCutoff': 0.0,
+                'allowBacklogs': false,
+                'backlogs': 0,
+              },
+            });
+          }
+          
+          // Fetch user document again to get complete data
+          userDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+          
+          if (userDoc.exists) {
+            await Provider.of<UserProvider>(context, listen: false)
+                .setCurrentUserFromDoc(userDoc, emails);
             
-            // User doesn't exist, redirect to signup page with pre-filled email
+            // Navigate to HomeScreen
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => SignupScreen(googleEmail: googleUser.email),
-              ),
-            );
-            
-            // Show a message to the user
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please complete your profile information to sign up')),
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
             );
           }
+        } else {
+          // User canceled registration
+          await FirebaseAuth.instance.signOut();
+          await _gmailService.signOut();
+          setState(() {
+            _isGoogleLoading = false;
+          });
         }
-      } else {
-        // If sign-in was not successful, ensure we're signed out
-        await _gmailService.signOut();
       }
     } catch (e) {
-      // Sign out on error to reset the authentication state
-      await _gmailService.signOut();
+      print('Google Sign-In error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google Sign-In failed: ${e.toString()}')),
+        SnackBar(
+          content: Text('Error during Google Sign-In: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
-    } finally {
       setState(() {
         _isGoogleLoading = false;
       });
     }
+  }
+
+  Future<void> _handleSignOut() async {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LandingPage()),
+    );
+  }
+  
+  // Dialog to collect additional information for Google Sign-In users
+  Widget _buildRegistrationDialog(String email) {
+    final nameController = TextEditingController();
+    final rollNumberController = TextEditingController();
+    final semesterController = TextEditingController();
+    String selectedRole = 'student'; // Default role
+    
+    return AlertDialog(
+      title: const Text('Complete Your Profile'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Email: $email', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Role',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedRole,
+              onChanged: (value) {
+                selectedRole = value!;
+              },
+              items: const [
+                DropdownMenuItem(value: 'student', child: Text('Student')),
+                DropdownMenuItem(value: 'faculty', child: Text('Faculty')),
+                DropdownMenuItem(value: 'alumni', child: Text('Alumni')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Only show these fields if role is student
+            if (selectedRole == 'student') ...[
+              TextField(
+                controller: rollNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Roll Number',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: semesterController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Semester',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(), // Cancel
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            // Validate inputs
+            if (nameController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter your name')),
+              );
+              return;
+            }
+            
+            if (selectedRole == 'student') {
+              if (rollNumberController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your roll number')),
+                );
+                return;
+              }
+              
+              if (semesterController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your semester')),
+                );
+                return;
+              }
+            }
+            
+            // Return the collected information
+            Navigator.of(context).pop({
+              'name': nameController.text.trim(),
+              'role': selectedRole,
+              'rollNumber': rollNumberController.text.trim(),
+              'semester': semesterController.text.trim(),
+            });
+          },
+          child: const Text('Submit'),
+        ),
+      ],
+    );
   }
 
   @override

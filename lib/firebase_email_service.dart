@@ -85,4 +85,44 @@ class FirebaseEmailService {
       return [];
     }
   }
+  
+  /// Retrieves emails from Firestore that are from allowed senders
+  /// This is used as a fallback when the user doesn't have Gmail access
+  Future<List<EmailMessage>> getStoredEmails() async {
+    try {
+      final List<String> allowedSenders = [
+        'placements@marwadieducation.edu.in',
+        'shyama.vu3whg@gmail.com',
+        'shyama.vagadia117229@marwadiuniversity.ac.in'
+      ];
+      
+      // Query for emails from any of the allowed senders
+      final QuerySnapshot snapshot = await _firestore
+          .collection(_collectionName)
+          .orderBy('timestamp', descending: true)
+          .get();
+      
+      // Filter emails from allowed senders
+      final filteredEmails = snapshot.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .where((data) {
+            final from = data['from'] as String;
+            return allowedSenders.any((sender) => from.contains(sender));
+          })
+          .map((data) => EmailMessage(
+                id: data['id'],
+                subject: data['subject'],
+                from: data['from'],
+                date: data['date'],
+                snippet: data['snippet'],
+              ))
+          .toList();
+      
+      print('Retrieved ${filteredEmails.length} emails from allowed senders');
+      return filteredEmails;
+    } catch (error) {
+      print('Error retrieving filtered emails from Firestore: $error');
+      return [];
+    }
+  }
 }
