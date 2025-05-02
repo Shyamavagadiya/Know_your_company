@@ -11,6 +11,7 @@ class UserProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GmailService _gmailService = GmailService();
   bool _isLoading = false;
   List<EmailMessage>? _fetchedEmails;
 
@@ -46,10 +47,9 @@ class UserProvider with ChangeNotifier {
           _currentUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
           
           // Fetch emails for the user if they're authenticated
-          final GmailService gmailService = GmailService();
-          if (await gmailService.isSignedIn()) {
+          if (await _gmailService.isSignedIn()) {
             // Only show emails from specific senders
-            _fetchedEmails = await gmailService.fetchEmails(
+            _fetchedEmails = await _gmailService.fetchEmails(
               allowedSenders: ['placements@marwadieducation.edu.in', 'shyama.vu3whg@gmail.com'],
               daysAgo: 30
             );
@@ -70,9 +70,8 @@ class UserProvider with ChangeNotifier {
   Future<void> signOut() async {
     try {
       // Sign out from Gmail service if signed in
-      final GmailService gmailService = GmailService();
-      if (await gmailService.isSignedIn()) {
-        await gmailService.signOut();
+      if (await _gmailService.isSignedIn()) {
+        await _gmailService.signOut();
       }
       
       // Sign out from Firebase Auth
@@ -100,5 +99,11 @@ class UserProvider with ChangeNotifier {
       print('Error setting current user from doc: $e');
       rethrow;
     }
+  }
+  
+  // Method to store fetched emails from Gmail service
+  Future<void> storeFetchedEmails(List<EmailMessage> emails) async {
+    _fetchedEmails = emails;
+    notifyListeners();
   }
 }

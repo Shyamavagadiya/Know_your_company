@@ -48,13 +48,13 @@ class _HomeScreenState extends State<HomeScreen> {
         // Route to the appropriate dashboard based on the user's role
         switch (userProvider.currentUser!.role) {
           case 'student':
-            return const StudentDashboard();
+            return StudentDashboard(userName: userProvider.currentUser!.name);
           case 'faculty':
-            return const FacultyDashboard();
+            return FacultyDashboard(userName: userProvider.currentUser!.name);
           case 'hod':
-            return const HodDashboard();
+            return HodDashboard(userName: userProvider.currentUser!.name);
           case 'placement_coordinator':
-            return  PlacementCoordinatorDashboard();
+            return PlacementCoordinatorDashboard();
           case 'alumni':
             return const AlumniDashboard();
           default:
