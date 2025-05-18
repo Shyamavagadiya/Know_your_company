@@ -9,13 +9,43 @@ import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
 import 'package:hcd_project2/home_screen.dart';
 import 'package:hcd_project2/splash_screen.dart';
+import 'package:hcd_project2/notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+// Background message handler
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('Handling a background message: ${message.messageId}');
+}
+
+// Initialize local notifications
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // This line is crucial
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MyApp());
+  
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
+  // Initialize local notifications
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  
+  // Initialize notification service
+  await NotificationService().initialize();
+  
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
