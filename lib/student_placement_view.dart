@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 class StudentPlacementHistoryPage extends StatefulWidget {
   const StudentPlacementHistoryPage({Key? key}) : super(key: key);
@@ -9,11 +10,19 @@ class StudentPlacementHistoryPage extends StatefulWidget {
   State<StudentPlacementHistoryPage> createState() => _StudentPlacementHistoryPageState();
 }
 
-class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPage> {
+class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPage> with SingleTickerProviderStateMixin {
   final CollectionReference companiesCollection =
       FirebaseFirestore.instance.collection('placement_history');
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
   bool _showDebugInfo = false; // Toggle for debug information
+  
+  // Tab controller for switching between placement history and company registration
+  late TabController _tabController;
+  
+  // Company registration section
+  List<Map<String, dynamic>> _availableCompanies = [];
+  bool _isLoadingCompanies = false;
+  bool _isRegistering = false;
   
   // Track student selections in a separate collection
   Future<void> _updateSelectionStatus(String companyId, String roundId, bool isSelected) async {
@@ -349,228 +358,433 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   }
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadAvailableCompanies();
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+  
+  // Load available companies for registration
+  Future<void> _loadAvailableCompanies() async {
+    setState(() {
+      _isLoadingCompanies = true;
+    });
+    
+    try {
+      // Get all companies first, then filter in the app to avoid needing a composite index
+      final snapshot = await FirebaseFirestore.instance
+          .collection('companies')
+          .get();
+      
+      List<Map<String, dynamic>> companies = [];
+      for (var doc in snapshot.docs) {
+        // Only include companies that are open for registration
+        // Handle possible field name variations
+        final bool isRegistrationOpen = doc.data().containsKey('isRegistrationOpen') 
+            ? doc['isRegistrationOpen'] ?? true
+            : true; // Default to true if field doesn't exist
+        if (!isRegistrationOpen) continue;
+        
+        // Check if the user has already registered for this company
+        final registrationDoc = await FirebaseFirestore.instance
+            .collection('company_registrations')
+            .where('companyId', isEqualTo: doc.id)
+            .where('studentId', isEqualTo: currentUserId)
+            .get();
+        
+        final bool isRegistered = registrationDoc.docs.isNotEmpty;
+        
+        companies.add({
+          'id': doc.id,
+          'name': doc['name'],
+          'isRegistered': isRegistered,
+          'registrationId': isRegistered ? registrationDoc.docs.first.id : null,
+        });
+      }
+      
+      // Sort by most recent first (if timestamp exists)
+      companies.sort((a, b) {
+        try {
+          var docA = snapshot.docs.firstWhere((doc) => doc.id == a['id']);
+          var docB = snapshot.docs.firstWhere((doc) => doc.id == b['id']);
+          
+          var timestampA = docA.data().containsKey('timestamp') ? docA['timestamp'] : null;
+          var timestampB = docB.data().containsKey('timestamp') ? docB['timestamp'] : null;
+          
+          if (timestampA == null && timestampB == null) return 0;
+          if (timestampA == null) return 1;
+          if (timestampB == null) return -1;
+          
+          return timestampB.compareTo(timestampA); // Descending order
+        } catch (e) {
+          return 0; // Default to no change in order if there's an error
+        }
+      });
+      
+      setState(() {
+        _availableCompanies = companies;
+        _isLoadingCompanies = false;
+      });
+    } catch (e) {
+      print('Error loading companies: $e');
+      setState(() {
+        _isLoadingCompanies = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading companies: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  // Register for a company
+  Future<void> _registerForCompany(String companyId) async {
+    if (currentUserId == null) {
+      _showErrorMessage('User not authenticated');
+      return;
+    }
+    
+    setState(() {
+      _isRegistering = true;
+    });
+    
+    try {
+      // Add registration to the company_registrations collection
+      await FirebaseFirestore.instance.collection('company_registrations').add({
+        'companyId': companyId,
+        'studentId': currentUserId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending', // Could be 'pending', 'approved', 'rejected'
+      });
+      
+      // Refresh the list of available companies
+      await _loadAvailableCompanies();
+      
+      _showSuccessMessage('Successfully registered for the company');
+    } catch (e) {
+      _showErrorMessage('Failed to register: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isRegistering = false;
+      });
+    }
+  }
+  
+  // Cancel registration for a company
+  Future<void> _cancelRegistration(String registrationId) async {
+    setState(() {
+      _isRegistering = true;
+    });
+    
+    try {
+      // Delete the registration document
+      await FirebaseFirestore.instance
+          .collection('company_registrations')
+          .doc(registrationId)
+          .delete();
+      
+      // Refresh the list of available companies
+      await _loadAvailableCompanies();
+      
+      _showSuccessMessage('Registration cancelled successfully');
+    } catch (e) {
+      _showErrorMessage('Failed to cancel registration: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isRegistering = false;
+      });
+    }
+  }
+  
+  // Build the company registration section
+  Widget _buildCompanyRegistrationSection() {
+    if (_isLoadingCompanies) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_availableCompanies.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'No companies available for registration',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Check back later for new opportunities',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadAvailableCompanies,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A6BE),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      itemCount: _availableCompanies.length,
+      padding: const EdgeInsets.all(16),
+      itemBuilder: (context, index) {
+        final company = _availableCompanies[index];
+        final bool isRegistered = company['isRegistered'] ?? false;
+        final String? registrationId = company['registrationId'];
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(
+                  company['name'],
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isRegistered 
+                          ? 'Status: Registered' 
+                          : 'Status: Open for Registration',
+                      style: TextStyle(
+                        color: isRegistered ? Colors.green : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (isRegistered)
+                      ElevatedButton(
+                        onPressed: _isRegistering 
+                            ? null 
+                            : () => _cancelRegistration(registrationId!),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _isRegistering
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Cancel Registration'),
+                      )
+                    else
+                      ElevatedButton(
+                        onPressed: _isRegistering 
+                            ? null 
+                            : () => _registerForCompany(company['id']),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00A6BE),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: _isRegistering
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Register'),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        title: const Text('Placement'),
+        backgroundColor: const Color(0xFF00A6BE),
         foregroundColor: Colors.white,
-        title: Text('Placement Opportunities'),
-        backgroundColor: const Color.fromARGB(255, 0, 166, 190),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          tabs: const [
+            Tab(text: 'Placement History'),
+            Tab(text: 'Company Registration'),
+          ],
+        ),
         actions: [
-          if (currentUserId != null)
-            IconButton(
-              icon: Icon(Icons.history),
-              onPressed: _viewAllSelectionHistory,
-              tooltip: 'View Selection History',
-            ),
-          // Debug mode toggle (long press to activate)
-          GestureDetector(
-            onLongPress: _toggleDebugMode,
-            child: IconButton(
-              icon: Icon(_showDebugInfo ? Icons.bug_report : Icons.info_outline),
-              onPressed: () {
-                if (_showDebugInfo) {
-                  _toggleDebugMode();
-                }
-              },
-            ),
+          // Debug mode toggle
+          IconButton(
+            icon: Icon(_showDebugInfo ? Icons.bug_report : Icons.bug_report_outlined),
+            onPressed: _toggleDebugMode,
+            tooltip: 'Toggle Debug Info',
+          ),
+          // View all history button
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _viewAllSelectionHistory,
+            tooltip: 'View All History',
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 8)],
-          ),
-          child: currentUserId == null 
-              ? Center(child: Text('Please log in to view placement history'))
-              : StreamBuilder<QuerySnapshot>(
-                  stream: companiesCollection.snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    }
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: Placement History
+          StreamBuilder<QuerySnapshot>(
+            stream: companiesCollection.snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
-                    if (snapshot.hasError && _showDebugInfo) {
-                      return Center(child: Text("Error: ${snapshot.error}"));
-                    }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(child: Text("No companies available"));
-                    }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text('No placement data available'));
+              }
 
-                    var companies = snapshot.data!.docs;
-                    
-                    if (_showDebugInfo) {
-                      print("Found ${companies.length} companies");
-                    }
-
-                    return ListView.builder(
-                      itemCount: companies.length,
-                      itemBuilder: (context, companyIndex) {
-                        var company = companies[companyIndex];
-                        String companyId = company.id;
-                        String companyName = company['name'];
-                        
-                        if (_showDebugInfo) {
-                          print("Company: $companyName, ID: $companyId");
-                        }
-                        
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Company header
-                            ListTile(
-                              leading: Icon(
-                                _getIcon(company['icon']),
-                                color: _getColor(company['iconColor']),
-                              ),
-                              title: Text(
-                                companyName,
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
+              return ListView.builder(
+                itemCount: snapshot.data!.docs.length,
+                padding: const EdgeInsets.all(16),
+                itemBuilder: (context, index) {
+                  final companyDoc = snapshot.data!.docs[index];
+                  final companyData = companyDoc.data() as Map<String, dynamic>;
+                  final companyName = companyData['name'] ?? 'Unknown Company';
+                  final companyIcon = companyData['icon'] ?? 'business';
+                  final companyColor = companyData['color'] ?? 'blue';
+                  final rounds = companyData['rounds'] ?? [];
+                  
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: _getColor(companyColor).withOpacity(0.2),
+                            child: Icon(_getIcon(companyIcon), color: _getColor(companyColor)),
+                          ),
+                          title: Text(
+                            companyName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text('Placement ID: ${companyDoc.id}'),
+                        ),
+                        const Divider(),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: rounds.length,
+                          itemBuilder: (context, roundIndex) {
+                            final round = rounds[roundIndex];
+                            final roundName = round['name'] ?? 'Round ${roundIndex + 1}';
+                            final roundId = round['id'] ?? 'round_${roundIndex + 1}';
                             
-                            // Rounds for this company (only show published rounds)
-                            // IMPORTANT CHANGE: Removed orderBy to troubleshoot
-                            StreamBuilder<QuerySnapshot>(
-                              stream: companiesCollection
-                                  .doc(companyId)
-                                  .collection('rounds')
-                                  .where('isPublished', isEqualTo: true)
-                                  // .orderBy('createdAt', descending: true) - Temporarily removed
-                                  .snapshots(),
-                              builder: (context, roundSnapshot) {
-                                if (roundSnapshot.connectionState == ConnectionState.waiting) {
-                                  return Padding(
-                                    padding: EdgeInsets.all(16.0),
-                                    child: Center(child: CircularProgressIndicator()),
-                                  );
+                            return StreamBuilder<DocumentSnapshot>(
+                              stream: _getSelectionStatus(companyDoc.id, roundId),
+                              builder: (context, selectionSnapshot) {
+                                bool isSelected = false;
+                                if (selectionSnapshot.hasData && selectionSnapshot.data!.exists) {
+                                  isSelected = selectionSnapshot.data!['isSelected'] ?? false;
                                 }
                                 
-                                // Debug information
-                                if (_showDebugInfo) {
-                                  if (roundSnapshot.hasError) {
-                                    print("Error in rounds query for $companyName: ${roundSnapshot.error}");
-                                    return Padding(
-                                      padding: EdgeInsets.all(16.0),
-                                      child: Text('Error: ${roundSnapshot.error}'),
-                                    );
-                                  }
-                                  
-                                  print("Company $companyName: Found ${roundSnapshot.hasData ? roundSnapshot.data!.docs.length : 0} published rounds");
-                                  
-                                  if (roundSnapshot.hasData) {
-                                    for (var doc in roundSnapshot.data!.docs) {
-                                      print("Round: ${doc.id}, isPublished: ${doc['isPublished']}, name: ${doc['name']}");
-                                    }
-                                  }
-                                }
-                                
-                                if (!roundSnapshot.hasData || roundSnapshot.data!.docs.isEmpty) {
-                                  return Padding(
-                                    padding: EdgeInsets.all(16.0),
-                                    child: Text('  No published rounds from this company'),
-                                  );
-                                }
-                                
-                                var rounds = roundSnapshot.data!.docs;
-                                
-                                return Padding(
-                                  padding: EdgeInsets.only(left: 32.0),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: NeverScrollableScrollPhysics(),
-                                    itemCount: rounds.length,
-                                    itemBuilder: (context, roundIndex) {
-                                      var round = rounds[roundIndex];
-                                      String roundId = round.id;
-                                      String roundName = round['name'];
-                                      
-                                      return StreamBuilder<DocumentSnapshot>(
-                                        stream: _getSelectionStatus(companyId, roundId),
-                                        builder: (context, selectionSnapshot) {
-                                          bool isSelected = false;
-                                          
-                                          if (selectionSnapshot.hasData && 
-                                              selectionSnapshot.data!.exists) {
-                                            isSelected = selectionSnapshot.data!['isSelected'] ?? false;
-                                          }
-                                          
-                                          return Card(
-                                            elevation: 0,
-                                            color: Colors.grey[50],
-                                            margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                              side: BorderSide(color: Colors.grey.shade200),
-                                            ),
-                                            child: Padding(
-                                              padding: const EdgeInsets.all(12.0),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(
-                                                        roundName,
-                                                        style: TextStyle(
-                                                          fontWeight: FontWeight.w600,
-                                                          fontSize: 16,
-                                                        ),
-                                                      ),
-                                                      // Statistics button
-                                                      IconButton(
-                                                        icon: Icon(Icons.analytics, color: Colors.blue),
-                                                        onPressed: () => _viewSelectionStatistics(
-                                                          companyId, roundId, companyName, roundName),
-                                                        tooltip: 'View Statistics',
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  SizedBox(height: 16),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                                    children: [
-                                                      _buildSelectionButton(
-                                                        false, 
-                                                        isSelected == false,
-                                                        () => _updateSelectionStatus(
-                                                            companyId, roundId, false)
-                                                      ),
-                                                      SizedBox(width: 16),
-                                                      _buildSelectionButton(
-                                                        true, 
-                                                        isSelected == true,
-                                                        () => _updateSelectionStatus(
-                                                            companyId, roundId, true)
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
+                                return Column(
+                                  children: [
+                                    ListTile(
+                                      title: Text(roundName),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.bar_chart, color: Colors.blue),
+                                            onPressed: () => _viewSelectionStatistics(
+                                                companyDoc.id, roundId, companyName, roundName),
+                                            tooltip: 'View Statistics',
+                                          ),
+                                        ],
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (_showDebugInfo) Text('Round ID: $roundId'),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                            children: [
+                                              _buildSelectionButton(
+                                                  false, 
+                                                  isSelected == false,
+                                                  () => _updateSelectionStatus(
+                                                      companyDoc.id, roundId, false)
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
+                                              SizedBox(width: 16),
+                                              _buildSelectionButton(
+                                                  true, 
+                                                  isSelected == true,
+                                                  () => _updateSelectionStatus(
+                                                      companyDoc.id, roundId, true)
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Divider(color: Colors.grey[300]),
+                                  ],
                                 );
                               },
-                            ),
-                            Divider(color: Colors.grey[300]),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                ),
-        ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          
+          // Tab 2: Company Registration
+          _buildCompanyRegistrationSection(),
+        ],
       ),
     );
   }

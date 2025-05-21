@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
           case 'hod':
             return HodDashboard(userName: userProvider.currentUser!.name);
           case 'placement_coordinator':
-            return PlacementCoordinatorDashboard();
+            return PlacementCoordinatorDashboard(userName: userProvider.currentUser!.name);
           case 'alumni':
             return const AlumniDashboard();
           default:
