@@ -5,6 +5,7 @@ import 'package:hcd_project2/home_screen.dart';
 import 'package:hcd_project2/login_page.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:hcd_project2/landing_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -41,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         // User is not logged in, navigate to LoginScreen
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => const LandingPage()),
         );
       }
     } catch (e) {

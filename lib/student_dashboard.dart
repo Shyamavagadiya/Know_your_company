@@ -8,9 +8,6 @@ import 'package:hcd_project2/gmail_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/firebase_email_service.dart';
 
-// Use the class from GmailService.dart instead of redefining it
-// import 'package:hcd_project2/gmail_service.dart';
-
 class StudentDashboard extends StatefulWidget {
   final String userName;
 
@@ -389,7 +386,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 Expanded(
                   child: _showEmails 
                     ? Container(
-                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: const BorderRadius.only(
@@ -407,35 +403,39 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Company Emails',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                            Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Company Emails',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back),
-                                  onPressed: _toggleEmailView,
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: _toggleEmailView,
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
                             Expanded(
                               child: _isLoading
                                 ? const Center(child: CircularProgressIndicator())
-                                : SingleChildScrollView(
-                                    child: _buildEmailList(),
+                                : Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                    child: SingleChildScrollView(
+                                      child: _buildEmailList(),
+                                    ),
                                   ),
                             ),
                           ],
                         ),
                       )
                     : Container(
-                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: const BorderRadius.only(
@@ -450,90 +450,93 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             ),
                           ],
                         ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            int crossAxisCount =
-                                constraints.maxWidth > 600 ? 3 : 2;
-                            return GridView.count(
-                              crossAxisCount: crossAxisCount,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              children: [
-                                _buildCardButton(
-                                  context,
-                                  'Company Details',
-                                  Icons.business,
-                                  Colors.blue,
-                                  () {
-                                    _toggleEmailView();
-                                  },
-                                  _isLoading,
-                                  _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  "Placement History",
-                                  Icons.history,
-                                  Colors.green,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentPlacementHistoryPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Announcements',
-                                  Icons.campaign,
-                                  Colors.orange,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentAnnouncementView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Files',
-                                  Icons.folder_open,
-                                  Colors.red,
-                                  () {},
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Quizzes',
-                                  Icons.fact_check,
-                                  Colors.purple,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentQuizView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Resume upload',
-                                  Icons.upload_file,
-                                  Colors.brown,
-                                  () {},
-                                ),
-                              ],
-                            );
-                          },
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              int crossAxisCount =
+                                  constraints.maxWidth > 600 ? 3 : 2;
+                              return GridView.count(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  _buildCardButton(
+                                    context,
+                                    'Company Details',
+                                    Icons.business,
+                                    Colors.blue,
+                                    () {
+                                      _toggleEmailView();
+                                    },
+                                    _isLoading,
+                                    _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    "Placement History",
+                                    Icons.history,
+                                    Colors.green,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentPlacementHistoryPage(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Announcements',
+                                    Icons.campaign,
+                                    Colors.orange,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentAnnouncementView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Files',
+                                    Icons.folder_open,
+                                    Colors.red,
+                                    () {},
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Quizzes',
+                                    Icons.fact_check,
+                                    Colors.purple,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentQuizView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Resume upload',
+                                    Icons.upload_file,
+                                    Colors.brown,
+                                    () {},
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                 ),
