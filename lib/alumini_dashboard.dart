@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/alumini_mentorship_view.dart';
+import 'package:hcd_project2/alumni_job_listings_view.dart';
+import 'package:hcd_project2/alumni_networking_view.dart';
 
 class AlumniDashboard extends StatelessWidget {
   const AlumniDashboard({
@@ -133,6 +135,8 @@ class AlumniDashboard extends StatelessWidget {
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
                           shrinkWrap: true,
+                          // Allow scrolling within the grid
+                          physics: const ScrollPhysics(),
                           children: [
                             _buildCardButton(
                               context,
@@ -149,7 +153,12 @@ class AlumniDashboard extends StatelessWidget {
                               Icons.connect_without_contact,
                               Colors.green,
                               () {
-                                // Navigate to networking events screen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AlumniNetworkingView(),
+                                  ),
+                                );
                               },
                             ),
                             _buildCardButton(
@@ -190,7 +199,12 @@ class AlumniDashboard extends StatelessWidget {
                               Icons.work,
                               Colors.teal,
                               () {
-                                // Navigate to job listings screen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AlumniJobListingsView(),
+                                  ),
+                                );
                               },
                             ),
                           ],

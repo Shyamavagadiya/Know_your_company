@@ -5,6 +5,7 @@ import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
 import 'package:hcd_project2/placement_history_page.dart';
 import 'package:hcd_project2/student_scores_view.dart';
+import 'package:hcd_project2/job_listings_view.dart';
 
 class HodDashboard extends StatelessWidget {
   final String userName;
@@ -140,7 +141,8 @@ class HodDashboard extends StatelessWidget {
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(), // Disable scrolling for GridView to let SingleChildScrollView handle it
+                          // Allow scrolling within the grid
+                          physics: const ScrollPhysics(), // Enable scrolling to see all buttons
                           children: [
                             _buildCardButton(
                               context,
@@ -223,6 +225,20 @@ class HodDashboard extends StatelessWidget {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => const HodRoundResultsPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildCardButton(
+                              context,
+                              'Alumni Careers',
+                              Icons.work,
+                              Colors.teal,
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const JobListingsView(),
                                   ),
                                 );
                               },

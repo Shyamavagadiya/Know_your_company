@@ -4,6 +4,7 @@ import 'package:hcd_project2/student_announcement_view.dart';
 import 'package:hcd_project2/student_placement_view.dart';
 import 'package:hcd_project2/student_quiz_view.dart';
 import 'package:hcd_project2/student_mentorship_view.dart';
+import 'package:hcd_project2/job_listings_view.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/gmail_service.dart';
 import 'package:provider/provider.dart';
@@ -460,7 +461,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               mainAxisSpacing: 16,
                               crossAxisSpacing: 16,
                               shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
+                              // Allow scrolling within the grid
+                              physics: const ScrollPhysics(),
                               children: [
                                 _buildCardButton(
                                   context,
@@ -539,6 +541,20 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   Icons.upload_file,
                                   Colors.brown,
                                   () {},
+                                ),
+                                _buildCardButton(
+                                  context,
+                                  'Alumni Careers',
+                                  Icons.work,
+                                  Colors.teal,
+                                  () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const JobListingsView(),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             );

@@ -4,6 +4,7 @@ import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
 import 'package:hcd_project2/placement_history_page.dart';
 import 'package:hcd_project2/student_scores_view.dart';
+import 'package:hcd_project2/job_listings_view.dart';
 
 class FacultyDashboard extends StatelessWidget {
   final String? userName;
@@ -139,6 +140,9 @@ class FacultyDashboard extends StatelessWidget {
                           crossAxisCount: crossAxisCount,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
+                          shrinkWrap: true,
+                          // Allow scrolling within the grid
+                          physics: const ScrollPhysics(),
                           children: [
                             _buildCardButton(
                               context,
@@ -206,6 +210,20 @@ class FacultyDashboard extends StatelessWidget {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => StudentScoresView(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildCardButton(
+                              context,
+                              'Alumni Careers',
+                              Icons.work,
+                              Colors.teal,
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const JobListingsView(),
                                   ),
                                 );
                               },
