@@ -225,32 +225,45 @@ class _HodRoundResultsPageState extends State<HodRoundResultsPage> {
     required String label,
     required Color color,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Text(
-              '$count',
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: color.withOpacity(0.2),
+            child: Text(
+              count.toString(),
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
             ),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -263,23 +276,34 @@ class _HodRoundResultsPageState extends State<HodRoundResultsPage> {
         backgroundColor: const Color(0xFF00A6BE),
         foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white,
+              Colors.grey.shade100,
+            ],
+          ),
+        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  )
+                : SafeArea(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       // Company Selection
                       Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -294,49 +318,62 @@ class _HodRoundResultsPageState extends State<HodRoundResultsPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            // Search field for companies
-                            TextField(
-                              controller: _companySearchController,
-                              decoration: InputDecoration(
-                                hintText: 'Search companies...',
-                                prefixIcon: const Icon(Icons.search),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
+                            // Combined search and dropdown for companies
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
                                 border: Border.all(color: Colors.grey),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: DropdownButton<String>(
-                                value: _selectedCompanyId,
-                                isExpanded: true,
-                                hint: const Text('Select a company'),
-                                underline: const SizedBox(),
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() {
-                                      _selectedCompanyId = value;
-                                      _selectedCompanyName = _companies
-                                          .firstWhere((c) => c['id'] == value)['name'];
-                                      _rounds = [];
-                                      _filteredRounds = [];
-                                      _results = [];
-                                    });
-                                    _loadRounds(value);
-                                  }
-                                },
-                                items: _filteredCompanies.map((company) {
-                                  return DropdownMenuItem<String>(
-                                    value: company['id'],
-                                    child: Text(company['name']),
-                                  );
-                                }).toList(),
+                              child: Column(
+                                children: [
+                                  // Search field integrated with dropdown
+                                  TextField(
+                                    controller: _companySearchController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Search companies...',
+                                      prefixIcon: const Icon(Icons.search),
+                                      border: InputBorder.none,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    ),
+                                  ),
+                                  // Divider between search and dropdown
+                                  const Divider(height: 1, thickness: 1),
+                                  // Dropdown for companies
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: DropdownButton<String>(
+                                      value: _selectedCompanyId,
+                                      isExpanded: true,
+                                      hint: const Text('Select a company'),
+                                      underline: const SizedBox(),
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          setState(() {
+                                            _selectedCompanyId = value;
+                                            _selectedCompanyName = _companies
+                                                .firstWhere((c) => c['id'] == value)['name'];
+                                            _rounds = [];
+                                            _filteredRounds = [];
+                                            _results = [];
+                                          });
+                                          _loadRounds(value);
+                                        }
+                                      },
+                                      items: _filteredCompanies.isEmpty
+                                          ? [DropdownMenuItem<String>(
+                                              value: null,
+                                              enabled: false,
+                                              child: Text('No companies found'),
+                                            )]
+                                          : _filteredCompanies.map((company) {
+                                              return DropdownMenuItem<String>(
+                                                value: company['id'],
+                                                child: Text(company['name']),
+                                              );
+                                            }).toList(),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -358,52 +395,64 @@ class _HodRoundResultsPageState extends State<HodRoundResultsPage> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              // Search field for rounds
-                              if (_rounds.isNotEmpty)
-                                TextField(
-                                  controller: _roundSearchController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Search rounds...',
-                                    prefixIcon: const Icon(Icons.search),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  ),
-                                ),
-                              const SizedBox(height: 8),
+                              // Combined search and dropdown for rounds
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
                                 decoration: BoxDecoration(
                                   border: Border.all(color: Colors.grey),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: _rounds.isEmpty
                                     ? const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 12),
+                                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                         child: Text('No rounds available for this company'),
                                       )
-                                    : DropdownButton<String>(
-                                        value: _selectedRoundId,
-                                        isExpanded: true,
-                                        hint: const Text('Select a round'),
-                                        underline: const SizedBox(),
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            setState(() {
-                                              _selectedRoundId = value;
-                                              _selectedRoundName = _rounds
-                                                  .firstWhere((r) => r['id'] == value)['name'];
-                                            });
-                                            _loadRoundResults(_selectedCompanyId!, value);
-                                          }
-                                        },
-                                        items: _filteredRounds.map((round) {
-                                          return DropdownMenuItem<String>(
-                                            value: round['id'],
-                                            child: Text(round['name']),
-                                          );
-                                        }).toList(),
+                                    : Column(
+                                        children: [
+                                          // Search field integrated with dropdown
+                                          TextField(
+                                            controller: _roundSearchController,
+                                            decoration: InputDecoration(
+                                              hintText: 'Search rounds...',
+                                              prefixIcon: const Icon(Icons.search),
+                                              border: InputBorder.none,
+                                              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                            ),
+                                          ),
+                                          // Divider between search and dropdown
+                                          const Divider(height: 1, thickness: 1),
+                                          // Dropdown for rounds
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                                            child: DropdownButton<String>(
+                                              value: _selectedRoundId,
+                                              isExpanded: true,
+                                              hint: const Text('Select a round'),
+                                              underline: const SizedBox(),
+                                              onChanged: (value) {
+                                                if (value != null) {
+                                                  setState(() {
+                                                    _selectedRoundId = value;
+                                                    _selectedRoundName = _rounds
+                                                        .firstWhere((r) => r['id'] == value)['name'];
+                                                  });
+                                                  _loadRoundResults(_selectedCompanyId!, value);
+                                                }
+                                              },
+                                              items: _filteredRounds.isEmpty
+                                                  ? [DropdownMenuItem<String>(
+                                                      value: null,
+                                                      enabled: false,
+                                                      child: Text('No rounds found'),
+                                                    )]
+                                                  : _filteredRounds.map((round) {
+                                                      return DropdownMenuItem<String>(
+                                                        value: round['id'],
+                                                        child: Text(round['name']),
+                                                      );
+                                                    }).toList(),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                               ),
                             ],
@@ -412,116 +461,218 @@ class _HodRoundResultsPageState extends State<HodRoundResultsPage> {
 
                       // Results Section (only if round is selected)
                       if (_selectedRoundId != null)
-                        Container(
-                          height: 500, // Fixed height container for results
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 16),
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _selectedCompanyName ?? 'Company',
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF00A6BE),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${_selectedRoundName ?? 'Round'} Results',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        _buildResultSummary(
-                                          count: _results.where((r) => r['isPassed'] == true).length,
-                                          label: 'Passed',
-                                          color: Colors.green,
-                                        ),
-                                        const SizedBox(width: 16),
-                                        _buildResultSummary(
-                                          count: _results.where((r) => r['isPassed'] == false).length,
-                                          label: 'Failed',
-                                          color: Colors.red,
-                                        ),
-                                        const SizedBox(width: 16),
-                                        _buildResultSummary(
-                                          count: _results.length,
-                                          label: 'Total',
-                                          color: Colors.blue,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.3),
+                                  spreadRadius: 1,
+                                  blurRadius: 5,
+                                  offset: Offset(0, -3),
                                 ),
-                              ),
-                              const Divider(),
-                              Expanded(
-                                child: _isLoadingResults
-                                    ? const Center(child: CircularProgressIndicator())
-                                    : _results.isEmpty
-                                        ? const Center(child: Text('No results found for this round'))
-                                        : ListView.builder(
-                                            itemCount: _results.length,
-                                            itemBuilder: (context, index) {
-                                              final result = _results[index];
-                                              final isPassed = result['isPassed'] ?? false;
-                                              
-                                              return Card(
-                                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                                elevation: 3,
-                                                child: ListTile(
-                                                  leading: CircleAvatar(
-                                                    backgroundColor: isPassed ? Colors.green : Colors.red,
-                                                    child: Icon(
-                                                      isPassed ? Icons.check : Icons.close,
-                                                      color: Colors.white,
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _selectedCompanyName ?? 'Company',
+                                                  style: const TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF00A6BE),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '${_selectedRoundName ?? 'Round'} Results',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFF00A6BE).withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              'Total: ${_results.length}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF00A6BE),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      // Summary cards in a row
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _buildResultSummary(
+                                              count: _results.where((r) => r['isPassed'] == true).length,
+                                              label: 'Passed',
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _buildResultSummary(
+                                              count: _results.where((r) => r['isPassed'] == false).length,
+                                              label: 'Failed',
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(thickness: 1),
+                                // Results list with proper scrolling
+                                Expanded(
+                                  child: _isLoadingResults
+                                      ? const Center(child: CircularProgressIndicator())
+                                      : _results.isEmpty
+                                          ? Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.search_off, size: 48, color: Colors.grey),
+                                                  SizedBox(height: 16),
+                                                  Text(
+                                                    'No results found for this round',
+                                                    style: TextStyle(color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : ListView.builder(
+                                              padding: EdgeInsets.only(bottom: 16),
+                                              itemCount: _results.length,
+                                              itemBuilder: (context, index) {
+                                                final result = _results[index];
+                                                final isPassed = result['isPassed'] ?? false;
+                                                
+                                                return Card(
+                                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                                  elevation: 2,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(12.0),
+                                                    child: Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        CircleAvatar(
+                                                          radius: 24,
+                                                          backgroundColor: isPassed ? Colors.green : Colors.red,
+                                                          child: Icon(
+                                                            isPassed ? Icons.check : Icons.close,
+                                                            color: Colors.white,
+                                                            size: 28,
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: 16),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                result['studentName'] ?? 'Unknown',
+                                                                style: const TextStyle(
+                                                                  fontWeight: FontWeight.bold,
+                                                                  fontSize: 16,
+                                                                ),
+                                                              ),
+                                                              SizedBox(height: 4),
+                                                              Text('Email: ${result['email'] ?? 'N/A'}'),
+                                                              Text('Enrollment: ${result['enrollmentNumber'] ?? 'N/A'}'),
+                                                              SizedBox(height: 4),
+                                                              Row(
+                                                                children: [
+                                                                  Container(
+                                                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                                    decoration: BoxDecoration(
+                                                                      color: isPassed ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                                                                      borderRadius: BorderRadius.circular(12),
+                                                                    ),
+                                                                    child: Text(
+                                                                      isPassed ? 'Passed' : 'Failed',
+                                                                      style: TextStyle(
+                                                                        color: isPassed ? Colors.green : Colors.red,
+                                                                        fontWeight: FontWeight.bold,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      'Completed: ${DateFormat('MMM d, yyyy').format(result['completedAt'].toDate())}',
+                                                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              if (result['resultNotes'] != null && result['resultNotes'].isNotEmpty)
+                                                                Padding(
+                                                                  padding: const EdgeInsets.only(top: 8.0),
+                                                                  child: Container(
+                                                                    padding: EdgeInsets.all(8),
+                                                                    decoration: BoxDecoration(
+                                                                      color: Colors.grey.withOpacity(0.1),
+                                                                      borderRadius: BorderRadius.circular(8),
+                                                                    ),
+                                                                    child: Column(
+                                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                                      children: [
+                                                                        Text(
+                                                                          'Notes:',
+                                                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                                                        ),
+                                                                        SizedBox(height: 4),
+                                                                        Text(result['resultNotes']),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                  title: Text(
-                                                    result['studentName'] ?? 'Unknown',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                                  ),
-                                                  subtitle: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text('Email: ${result['email'] ?? 'N/A'}'),
-                                                      Text('Enrollment: ${result['enrollmentNumber'] ?? 'N/A'}'),
-                                                      Text(
-                                                        'Status: ${isPassed ? 'Passed' : 'Failed'}',
-                                                        style: TextStyle(
-                                                          color: isPassed ? Colors.green : Colors.red,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      if (result['resultNotes'] != null && result['resultNotes'].isNotEmpty)
-                                                        Text('Notes: ${result['resultNotes']}'),
-                                                      Text(
-                                                        'Completed: ${DateFormat('MMM d, yyyy').format(result['completedAt'].toDate())}',
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  isThreeLine: true,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                              ),
-                            ],
+                                                );
+                                              },
+                                            ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+      ),
     );
   }
 }

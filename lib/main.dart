@@ -65,6 +65,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Placement Management',
+        debugShowCheckedModeBanner: false, // This line removes the debug banner
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),

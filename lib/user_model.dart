@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
@@ -10,6 +9,9 @@ class UserModel {
   final String fcmToken;
   final DateTime createdAt;
   final DateTime lastActive;
+
+  // Alias for compatibility
+  String get id => uid;
 
   UserModel({
     required this.uid,

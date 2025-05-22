@@ -3,6 +3,7 @@ import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/student_announcement_view.dart';
 import 'package:hcd_project2/student_placement_view.dart';
 import 'package:hcd_project2/student_quiz_view.dart';
+import 'package:hcd_project2/student_mentorship_view.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/gmail_service.dart';
 import 'package:provider/provider.dart';
@@ -491,7 +492,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   context,
                                   'Announcements',
                                   Icons.campaign,
-                                  Colors.orange,
+                                  Colors.blue,
                                   () {
                                     Navigator.push(
                                       context,
@@ -504,16 +505,24 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 ),
                                 _buildCardButton(
                                   context,
-                                  'Files',
-                                  Icons.folder_open,
-                                  Colors.red,
-                                  () {},
+                                  'Ask Alumni',
+                                  Icons.school,
+                                  Colors.purple,
+                                  () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const StudentMentorshipView(),
+                                      ),
+                                    );
+                                  },
                                 ),
                                 _buildCardButton(
                                   context,
                                   'Quizzes',
-                                  Icons.fact_check,
-                                  Colors.purple,
+                                  Icons.quiz,
+                                  Colors.orange,
                                   () {
                                     Navigator.push(
                                       context,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/user_provider.dart';
+import 'package:hcd_project2/alumini_mentorship_view.dart';
 
 class AlumniDashboard extends StatelessWidget {
   const AlumniDashboard({
@@ -157,7 +158,12 @@ class AlumniDashboard extends StatelessWidget {
                               Icons.supervisor_account,
                               Colors.orange,
                               () {
-                                // Navigate to mentorship program screen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AlumniMentorshipView(),
+                                  ),
+                                );
                               },
                             ),
                             _buildCardButton(
