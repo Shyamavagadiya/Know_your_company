@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:hcd_project2/services/round_service.dart';
+import 'package:hcd_project2/models/round_model.dart';
+import 'package:hcd_project2/models/student_round_progress_model.dart';
 
 class StudentPlacementHistoryPage extends StatefulWidget {
   const StudentPlacementHistoryPage({Key? key}) : super(key: key);
@@ -14,6 +17,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   final CollectionReference companiesCollection =
       FirebaseFirestore.instance.collection('placement_history');
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  final RoundService _roundService = RoundService();
   bool _showDebugInfo = false; // Toggle for debug information
   
   // Tab controller for switching between placement history and company registration
@@ -23,6 +27,14 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   List<Map<String, dynamic>> _availableCompanies = [];
   bool _isLoadingCompanies = false;
   bool _isRegistering = false;
+  
+  // Rounds management
+  Map<String, List<Round>> _companyRounds = {};
+  Map<String, Map<String, bool>> _roundCompletionStatus = {};
+  Map<String, Map<String, bool>> _roundPassStatus = {}; // Track if rounds were passed or failed
+  TextEditingController _roundNotesController = TextEditingController(); // For round result notes
+  bool _isLoadingRounds = false;
+  bool _isCompletingRound = false;
   
   // Track student selections in a separate collection
   Future<void> _updateSelectionStatus(String companyId, String roundId, bool isSelected) async {
@@ -357,6 +369,287 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
     _showSuccessMessage(_showDebugInfo ? 'Debug mode enabled' : 'Debug mode disabled');
   }
 
+  // Load rounds for a specific company
+  Future<void> _loadCompanyRounds(String companyId) async {
+    try {
+      // Always reload rounds to get the latest data
+      setState(() {
+        _isLoadingRounds = true;
+      });
+      
+      print('Loading rounds for company: $companyId');
+      
+      // First check if rounds exist in placement_history collection
+      final placementHistoryRounds = await FirebaseFirestore.instance
+          .collection('placement_history')
+          .doc(companyId)
+          .collection('rounds')
+          .orderBy('order')
+          .get();
+      
+      // If rounds exist in placement_history, use those
+      if (placementHistoryRounds.docs.isNotEmpty) {
+        final rounds = placementHistoryRounds.docs.map((doc) => Round(
+          id: doc.id,
+          name: doc['name'] ?? 'Unknown Round',
+          companyId: companyId,
+          order: doc['order'] ?? 0,
+          createdAt: doc['createdAt'] ?? Timestamp.now(),
+        )).toList();
+        
+        print('Loaded ${rounds.length} rounds from placement_history for company $companyId');
+        
+        // Get student's progress for this company
+        if (currentUserId != null) {
+          // Try to get progress from student_round_progress collection first
+          final progress = await _roundService.getStudentProgressForCompany(currentUserId!, companyId);
+          
+          // Create a map of roundId -> isCompleted
+          Map<String, bool> completionStatus = {};
+          Map<String, bool> passStatus = {};
+          
+          for (var round in rounds) {
+            final roundProgress = progress.where((p) => p.roundId == round.id).toList();
+            completionStatus[round.id] = roundProgress.isNotEmpty && roundProgress.first.isCompleted;
+            passStatus[round.id] = roundProgress.isNotEmpty && roundProgress.first.isPassed;
+          }
+          
+          setState(() {
+            _roundCompletionStatus[companyId] = completionStatus;
+            _roundPassStatus[companyId] = passStatus;
+          });
+        }
+        
+        setState(() {
+          _companyRounds[companyId] = rounds;
+          _isLoadingRounds = false;
+        });
+        return;
+      }
+      
+      // If no rounds in placement_history, fall back to the original method
+      final rounds = await _roundService.getRoundsForCompany(companyId);
+      
+      print('Loaded ${rounds.length} rounds for company $companyId');
+      for (var round in rounds) {
+        print('Round: ${round.id}, ${round.name}, order: ${round.order}');
+      }
+      
+      // Get student's progress for this company
+      if (currentUserId != null) {
+        final progress = await _roundService.getStudentProgressForCompany(currentUserId!, companyId);
+        
+        print('Loaded ${progress.length} progress records for student $currentUserId in company $companyId');
+        
+        // Create a map of roundId -> isCompleted
+        Map<String, bool> completionStatus = {};
+        Map<String, bool> passStatus = {};
+        for (var round in rounds) {
+          final roundProgress = progress.where((p) => p.roundId == round.id).toList();
+          completionStatus[round.id] = roundProgress.isNotEmpty && roundProgress.first.isCompleted;
+          passStatus[round.id] = roundProgress.isNotEmpty && roundProgress.first.isPassed;
+        }
+        
+        setState(() {
+          _roundCompletionStatus[companyId] = completionStatus;
+          _roundPassStatus[companyId] = passStatus;
+        });
+      }
+      
+      setState(() {
+        _companyRounds[companyId] = rounds;
+        _isLoadingRounds = false;
+      });
+    } catch (e) {
+      print('Error loading rounds: $e');
+      setState(() {
+        _isLoadingRounds = false;
+      });
+      _showErrorMessage('Failed to load rounds: ${e.toString()}');
+    }
+  }
+  
+  // Check if a student has passed all rounds for a company
+  Future<bool> _hasPassedAllRounds(String companyId) async {
+    if (currentUserId == null) return false;
+    
+    try {
+      return await _roundService.hasPassedAllRounds(currentUserId!, companyId);
+    } catch (e) {
+      _showErrorMessage('Error checking round completion: ${e.toString()}');
+      return false;
+    }
+  }
+  
+  // Check if a student has failed any round for a company
+  Future<bool> _hasFailedAnyRound(String companyId) async {
+    if (currentUserId == null) return false;
+    
+    try {
+      return await _roundService.hasFailedAnyRound(currentUserId!, companyId);
+    } catch (e) {
+      _showErrorMessage('Error checking round failure: ${e.toString()}');
+      return false;
+    }
+  }
+  
+  // Check if a student is placed in a company
+  Future<bool> _isPlaced(String companyId) async {
+    if (currentUserId == null) return false;
+    
+    try {
+      return await _roundService.isStudentPlaced(currentUserId!, companyId);
+    } catch (e) {
+      _showErrorMessage('Error checking placement status: ${e.toString()}');
+      return false;
+    }
+  }
+  
+  // Mark a round as passed or failed
+  Future<void> _submitRoundResult(String companyId, String roundId, bool isPassed, {String? notes}) async {
+    if (currentUserId == null) {
+      _showErrorMessage('User not authenticated');
+      return;
+    }
+    
+    setState(() {
+      _isCompletingRound = true;
+    });
+    
+    try {
+      await _roundService.markRoundResult(currentUserId!, companyId, roundId, isPassed, notes: notes);
+      
+      // Update the local completion status
+      setState(() {
+        if (!_roundCompletionStatus.containsKey(companyId)) {
+          _roundCompletionStatus[companyId] = {};
+        }
+        _roundCompletionStatus[companyId]![roundId] = true;
+        
+        // Store the pass/fail status
+        if (!_roundPassStatus.containsKey(companyId)) {
+          _roundPassStatus[companyId] = {};
+        }
+        _roundPassStatus[companyId]![roundId] = isPassed;
+      });
+      
+      if (isPassed) {
+        _showSuccessMessage('Round marked as passed successfully');
+        
+        // Check if all rounds are passed to show the "Placed" option
+        final allPassed = await _roundService.hasPassedAllRounds(currentUserId!, companyId);
+        if (allPassed) {
+          _showSuccessMessage('All rounds passed! You can now mark yourself as placed.');
+        }
+      } else {
+        _showErrorMessage('Round marked as failed. You cannot proceed further in this company\'s placement process.');
+      }
+      
+      // Reload the rounds to update the UI
+      _loadCompanyRounds(companyId);
+    } catch (e) {
+      _showErrorMessage('Failed to submit round result: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isCompletingRound = false;
+      });
+    }
+  }
+  
+  // Show dialog to confirm pass/fail result
+  void _showRoundResultDialog(String companyId, String roundId, String roundName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Round Result: $roundName'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Did you pass this round?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Notes (optional)',
+                hintText: 'Add any details about your result',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              controller: _roundNotesController,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitRoundResult(companyId, roundId, false, notes: _roundNotesController.text.isNotEmpty ? _roundNotesController.text : null);
+              _roundNotesController.clear();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Failed'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitRoundResult(companyId, roundId, true, notes: _roundNotesController.text.isNotEmpty ? _roundNotesController.text : null);
+              _roundNotesController.clear();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Passed'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Mark student as placed in a company
+  Future<void> _markAsPlaced(String companyId) async {
+    if (currentUserId == null) {
+      _showErrorMessage('User not authenticated');
+      return;
+    }
+    
+    // Check if all rounds are passed
+    final allPassed = await _hasPassedAllRounds(companyId);
+    if (!allPassed) {
+      _showErrorMessage('You must pass all rounds before marking yourself as placed');
+      return;
+    }
+    
+    // Check if any rounds are failed
+    final anyFailed = await _hasFailedAnyRound(companyId);
+    if (anyFailed) {
+      _showErrorMessage('You have failed one or more rounds and cannot be marked as placed');
+      return;
+    }
+    
+    setState(() {
+      _isCompletingRound = true;
+    });
+    
+    try {
+      await _roundService.markStudentAsPlaced(currentUserId!, companyId);
+      _showSuccessMessage('Congratulations! You have been placed in this company.');
+    } catch (e) {
+      _showErrorMessage('Failed to mark as placed: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isCompletingRound = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -367,6 +660,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   @override
   void dispose() {
     _tabController.dispose();
+    _roundNotesController.dispose();
     super.dispose();
   }
   
@@ -663,119 +957,308 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         controller: _tabController,
         children: [
           // Tab 1: Placement History
-          StreamBuilder<QuerySnapshot>(
-            stream: companiesCollection.snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+          FutureBuilder<QuerySnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('company_registrations')
+                .where('studentId', isEqualTo: currentUserId)
+                .get(),
+            builder: (context, registrationsSnapshot) {
+              if (registrationsSnapshot.hasError) {
+                return Center(child: Text('Error: ${registrationsSnapshot.error}'));
               }
 
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (registrationsSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('No placement data available'));
+              if (!registrationsSnapshot.hasData || registrationsSnapshot.data!.docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'You haven\'t registered for any companies yet',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Go to the "Company Registration" tab to register',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
               }
 
-              return ListView.builder(
-                itemCount: snapshot.data!.docs.length,
-                padding: const EdgeInsets.all(16),
-                itemBuilder: (context, index) {
-                  final companyDoc = snapshot.data!.docs[index];
-                  final companyData = companyDoc.data() as Map<String, dynamic>;
-                  final companyName = companyData['name'] ?? 'Unknown Company';
-                  final companyIcon = companyData['icon'] ?? 'business';
-                  final companyColor = companyData['color'] ?? 'blue';
-                  final rounds = companyData['rounds'] ?? [];
-                  
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: _getColor(companyColor).withOpacity(0.2),
-                            child: Icon(_getIcon(companyIcon), color: _getColor(companyColor)),
-                          ),
-                          title: Text(
-                            companyName,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text('Placement ID: ${companyDoc.id}'),
+              // Get all company IDs the student has registered for
+              final registeredCompanyIds = registrationsSnapshot.data!.docs
+                  .map((doc) => doc['companyId'] as String)
+                  .toList();
+
+              return FutureBuilder<QuerySnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('companies')
+                    .where(FieldPath.documentId, whereIn: registeredCompanyIds)
+                    .get(),
+                builder: (context, companiesSnapshot) {
+                  if (companiesSnapshot.hasError) {
+                    return Center(child: Text('Error: ${companiesSnapshot.error}'));
+                  }
+
+                  if (companiesSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!companiesSnapshot.hasData || companiesSnapshot.data!.docs.isEmpty) {
+                    return const Center(child: Text('No company data available'));
+                  }
+
+                  return ListView.builder(
+                    itemCount: companiesSnapshot.data!.docs.length,
+                    padding: const EdgeInsets.all(16),
+                    itemBuilder: (context, index) {
+                      final companyDoc = companiesSnapshot.data!.docs[index];
+                      final companyId = companyDoc.id;
+                      final companyName = companyDoc['name'] ?? 'Unknown Company';
+
+                      // Load rounds for this company if not already loaded
+                      if (!_companyRounds.containsKey(companyId)) {
+                        _loadCompanyRounds(companyId);
+                      }
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const Divider(),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: rounds.length,
-                          itemBuilder: (context, roundIndex) {
-                            final round = rounds[roundIndex];
-                            final roundName = round['name'] ?? 'Round ${roundIndex + 1}';
-                            final roundId = round['id'] ?? 'round_${roundIndex + 1}';
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue.withOpacity(0.2),
+                                child: Icon(Icons.business, color: Colors.blue),
+                              ),
+                              title: Text(
+                                companyName,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text('Placement Process'),
+                            ),
+                            const Divider(),
                             
-                            return StreamBuilder<DocumentSnapshot>(
-                              stream: _getSelectionStatus(companyDoc.id, roundId),
-                              builder: (context, selectionSnapshot) {
-                                bool isSelected = false;
-                                if (selectionSnapshot.hasData && selectionSnapshot.data!.exists) {
-                                  isSelected = selectionSnapshot.data!['isSelected'] ?? false;
-                                }
-                                
-                                return Column(
+                            // Show loading indicator while loading rounds
+                            if (_isLoadingRounds)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            // Show message if no rounds are available
+                            else if (!_companyRounds.containsKey(companyId) || _companyRounds[companyId]!.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
                                   children: [
-                                    ListTile(
-                                      title: Text(roundName),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.bar_chart, color: Colors.blue),
-                                            onPressed: () => _viewSelectionStatistics(
-                                                companyDoc.id, roundId, companyName, roundName),
-                                            tooltip: 'View Statistics',
-                                          ),
-                                        ],
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (_showDebugInfo) Text('Round ID: $roundId'),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                            children: [
-                                              _buildSelectionButton(
-                                                  false, 
-                                                  isSelected == false,
-                                                  () => _updateSelectionStatus(
-                                                      companyDoc.id, roundId, false)
-                                              ),
-                                              SizedBox(width: 16),
-                                              _buildSelectionButton(
-                                                  true, 
-                                                  isSelected == true,
-                                                  () => _updateSelectionStatus(
-                                                      companyDoc.id, roundId, true)
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                    Text(
+                                      'No rounds have been created for this company yet',
+                                      style: TextStyle(fontStyle: FontStyle.italic),
+                                    ),
+                                    SizedBox(height: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _loadCompanyRounds(companyId),
+                                      icon: Icon(Icons.refresh),
+                                      label: Text('Refresh Rounds'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF00A6BE),
+                                        foregroundColor: Colors.white,
                                       ),
                                     ),
-                                    Divider(color: Colors.grey[300]),
                                   ],
-                                );
-                              },
-                            );
-                          },
+                                ),
+                              )
+                            // Show rounds
+                            else
+                              FutureBuilder<List<bool>>(
+                                future: Future.wait([
+                                  _hasPassedAllRounds(companyId),
+                                  _hasFailedAnyRound(companyId),
+                                ]),
+                                builder: (context, snapshot) {
+                                  final allRoundsPassed = snapshot.data?[0] ?? false;
+                                  final anyRoundsFailed = snapshot.data?[1] ?? false;
+                                  
+                                  return Column(
+                                    children: [
+                                      // Display regular rounds
+                                      ListView.builder(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        itemCount: _companyRounds[companyId]!.length,
+                                        itemBuilder: (context, roundIndex) {
+                                          final round = _companyRounds[companyId]![roundIndex];
+                                          final isCompleted = _roundCompletionStatus[companyId]?[round.id] ?? false;
+                                          
+                                          // Check if previous rounds are passed (not just completed)
+                                          bool canComplete = true;
+                                          if (roundIndex > 0) {
+                                            for (int i = 0; i < roundIndex; i++) {
+                                              final prevRound = _companyRounds[companyId]![i];
+                                              final prevCompleted = _roundCompletionStatus[companyId]?[prevRound.id] ?? false;
+                                              final prevPassed = _roundPassStatus[companyId]?[prevRound.id] ?? false;
+                                              
+                                              // Only allow proceeding if previous round is both completed AND passed
+                                              if (!prevCompleted || !prevPassed) {
+                                                canComplete = false;
+                                                break;
+                                              }
+                                            }
+                                          }
+                                          
+                                          return Column(
+                                            children: [
+                                              ListTile(
+                                                leading: CircleAvatar(
+                                                  backgroundColor: isCompleted ? Colors.green.shade100 : Colors.grey.shade200,
+                                                  child: Text(
+                                                    '${roundIndex + 1}',
+                                                    style: TextStyle(
+                                                      color: isCompleted ? Colors.green.shade800 : Colors.grey.shade700,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                title: Text(
+                                                  round.name,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isCompleted ? Colors.green.shade800 : null,
+                                                  ),
+                                                ),
+                                                subtitle: Text(
+                                                  isCompleted
+                                                      ? ((_roundPassStatus[companyId]?[round.id] ?? false) 
+                                                           ? 'Passed'
+                                                           : 'Failed')
+                                                       : (canComplete
+                                                           ? 'In Progress'
+                                                           : 'Locked (pass all previous rounds first)'),
+                                                  style: TextStyle(
+                                                    color: isCompleted
+                                                        ? ((_roundPassStatus[companyId]?[round.id] ?? false)
+                                                             ? Colors.green.shade800
+                                                             : Colors.red.shade800)
+                                                        : null,
+                                                    fontWeight: isCompleted ? FontWeight.bold : null,
+                                                  ),
+                                                ),
+                                                trailing: isCompleted
+                                                     ? Icon(
+                                                         (_roundPassStatus[companyId]?[round.id] ?? false)
+                                                             ? Icons.check_circle
+                                                             : Icons.cancel,
+                                                         color: (_roundPassStatus[companyId]?[round.id] ?? false)
+                                                             ? Colors.green
+                                                             : Colors.red,
+                                                       )
+                                                    : ElevatedButton(
+                                                        onPressed: canComplete && !_isCompletingRound
+                                                            ? () => _showRoundResultDialog(companyId, round.id, round.name)
+                                                            : null,
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: const Color(0xFF00A6BE),
+                                                          foregroundColor: Colors.white,
+                                                        ),
+                                                        child: _isCompletingRound
+                                                            ? SizedBox(
+                                                                height: 20,
+                                                                width: 20,
+                                                                child: CircularProgressIndicator(
+                                                                  strokeWidth: 2,
+                                                                  color: Colors.white,
+                                                                ),
+                                                              )
+                                                            : Text('Submit Result'),
+                                                      ),
+                                              ),
+                                              Divider(color: Colors.grey[300]),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                      
+                                      // Display the "Placed" round if all other rounds are passed and no rounds are failed
+                                      if (allRoundsPassed && !anyRoundsFailed)
+                                        FutureBuilder<bool>(
+                                          future: _isPlaced(companyId),
+                                          builder: (context, isPlacedSnapshot) {
+                                            final isPlaced = isPlacedSnapshot.data ?? false;
+                                            
+                                            return Column(
+                                              children: [
+                                                ListTile(
+                                                  leading: CircleAvatar(
+                                                    backgroundColor: isPlaced ? Colors.green.shade100 : Colors.grey.shade200,
+                                                    child: Icon(
+                                                      Icons.check_circle,
+                                                      color: isPlaced ? Colors.green : Colors.grey,
+                                                    ),
+                                                  ),
+                                                  title: Text(
+                                                    'Placed',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isPlaced ? Colors.green.shade800 : null,
+                                                    ),
+                                                  ),
+                                                  subtitle: Text(
+                                                    isPlaced
+                                                        ? 'Congratulations! You have been placed in this company.'
+                                                        : 'Final step - Mark yourself as placed in this company',
+                                                  ),
+                                                  trailing: isPlaced
+                                                      ? Chip(
+                                                          label: Text('PLACED'),
+                                                          backgroundColor: Colors.green.shade100,
+                                                          labelStyle: TextStyle(color: Colors.green.shade800),
+                                                        )
+                                                      : ElevatedButton(
+                                                          onPressed: !_isCompletingRound
+                                                              ? () => _markAsPlaced(companyId)
+                                                              : null,
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: Colors.green,
+                                                            foregroundColor: Colors.white,
+                                                          ),
+                                                          child: _isCompletingRound
+                                                              ? SizedBox(
+                                                                  height: 20,
+                                                                  width: 20,
+                                                                  child: CircularProgressIndicator(
+                                                                    strokeWidth: 2,
+                                                                    color: Colors.white,
+                                                                  ),
+                                                                )
+                                                              : Text('Mark as Placed'),
+                                                        ),
+                                                ),
+                                                Divider(color: Colors.grey[300]),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               );

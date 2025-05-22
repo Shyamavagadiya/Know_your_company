@@ -4,7 +4,7 @@ import 'package:hcd_project2/alumini_dashboard.dart';
 import 'package:hcd_project2/faculty_dashboard.dart';
 import 'package:hcd_project2/hod_dashboard.dart';
 import 'package:hcd_project2/login_page.dart';
-import 'package:hcd_project2/placement_cordinator_dashboard.dart';
+import 'package:hcd_project2/placement_coordinator_dashboard.dart';
 import 'package:hcd_project2/student_dashboard.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
