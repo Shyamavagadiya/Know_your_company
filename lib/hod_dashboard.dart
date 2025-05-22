@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/announcements.dart';
+import 'package:hcd_project2/hod_round_results_page.dart';
 import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/module.dart';
 import 'package:hcd_project2/placement_history_page.dart';
@@ -139,7 +140,7 @@ class HodDashboard extends StatelessWidget {
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
                           shrinkWrap: true,
-                          physics: const AlwaysScrollableScrollPhysics(), // Enable scrolling
+                          physics: const NeverScrollableScrollPhysics(), // Disable scrolling for GridView to let SingleChildScrollView handle it
                           children: [
                             _buildCardButton(
                               context,
@@ -208,6 +209,20 @@ class HodDashboard extends StatelessWidget {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => StudentScoresView(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildCardButton(
+                              context,
+                              'Placement Round Results',
+                              Icons.assessment,
+                              Colors.purple,
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const HodRoundResultsPage(),
                                   ),
                                 );
                               },
