@@ -9,6 +9,7 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:hcd_project2/gmail_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/firebase_email_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Use the class from GmailService.dart instead of redefining it
 // import 'package:hcd_project2/gmail_service.dart';
@@ -30,6 +31,23 @@ class _StudentDashboardState extends State<StudentDashboard> {
   List<EmailMessage>? _emails;
   String? _errorMessage;
   bool _showEmails = false;
+  
+  // Function to open email in Gmail
+  Future<void> _openEmailInGmail(String emailId) async {
+    final Uri gmailUrl = Uri.parse('https://mail.google.com/mail/u/0/#inbox/$emailId');
+    
+    if (!await launchUrl(gmailUrl, mode: LaunchMode.externalApplication)) {
+      // If launching fails, show an error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open Gmail. Please make sure you have Gmail installed.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -210,32 +228,44 @@ class _StudentDashboardState extends State<StudentDashboard> {
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      email.subject.isEmpty ? '(No subject)' : email.subject,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'From: ${email.from}',
-                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      email.snippet,
-                      style: const TextStyle(fontSize: 14),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              child: InkWell(
+                onTap: () => _openEmailInGmail(email.id),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              email.subject.isEmpty ? '(No subject)' : email.subject,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'From: ${email.from}',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        email.snippet,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -352,30 +382,17 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     children: [
                       const SizedBox(height: 40),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${widget.userName}\'s Dashboard',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (_isLoading)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8.0),
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+  children: [
+    Flexible(
+      child: Text(
+        '${widget.userName}\'s Dashboard',
+        overflow: TextOverflow.ellipsis, // optional
+        style: TextStyle(fontSize: 25),
+      ),
+    ),
+  ],
+),
+
                       const SizedBox(height: 8),
                       const Text(
                         'Track Placement Progress',
