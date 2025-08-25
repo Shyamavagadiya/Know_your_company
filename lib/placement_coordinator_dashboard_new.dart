@@ -1,14 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hcd_project2/firebase_email_service.dart';
-import 'package:hcd_project2/gmail_service.dart';
-import 'package:hcd_project2/landing_page.dart';
-import 'package:hcd_project2/models/round_model.dart';
-import 'package:hcd_project2/notification_service.dart';
-import 'package:hcd_project2/services/round_service.dart';
-import 'package:hcd_project2/user_provider.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
 // Page to display registered students for a company
 class RegisteredStudentsPage extends StatelessWidget {

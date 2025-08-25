@@ -6,7 +6,7 @@ import 'package:hcd_project2/models/job_experience.dart';
 import 'package:hcd_project2/services/job_experience_service.dart';
 
 class AlumniNetworkingView extends StatefulWidget {
-  const AlumniNetworkingView({Key? key}) : super(key: key);
+  const AlumniNetworkingView({super.key});
 
   @override
   State<AlumniNetworkingView> createState() => _AlumniNetworkingViewState();
@@ -179,7 +179,7 @@ class _AlumniNetworkingViewState extends State<AlumniNetworkingView> {
                               value: company,
                               child: Text(company),
                             );
-                          }).toList(),
+                          }),
                         ],
                         onChanged: (value) {
                           setState(() {

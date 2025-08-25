@@ -6,7 +6,7 @@ import 'package:hcd_project2/services/mentorship_service.dart';
 import 'package:intl/intl.dart';
 
 class AlumniMentorshipView extends StatefulWidget {
-  const AlumniMentorshipView({Key? key}) : super(key: key);
+  const AlumniMentorshipView({super.key});
 
   @override
   State<AlumniMentorshipView> createState() => _AlumniMentorshipViewState();

@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 
 class StudentQuizView extends StatefulWidget {
-  const StudentQuizView({Key? key}) : super(key: key);
+  const StudentQuizView({super.key});
 
   @override
   _StudentQuizViewState createState() => _StudentQuizViewState();
@@ -197,11 +197,11 @@ class StudentQuizPage extends StatefulWidget {
   final String quizName;
 
   const StudentQuizPage({
-    Key? key,
+    super.key,
     required this.moduleId,
     required this.quizId,
     required this.quizName,
-  }) : super(key: key);
+  });
 
   @override
   _StudentQuizPageState createState() => _StudentQuizPageState();

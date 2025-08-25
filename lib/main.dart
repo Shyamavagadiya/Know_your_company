@@ -1,13 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hcd_project2/firebase_options.dart';
-import 'package:hcd_project2/gmail_screen.dart';
-import 'package:hcd_project2/login_page.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:hcd_project2/landing_page.dart';
-import 'package:hcd_project2/module.dart';
-import 'package:hcd_project2/home_screen.dart';
 import 'package:hcd_project2/splash_screen.dart';
 import 'package:hcd_project2/notification_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StudentScoresView extends StatefulWidget {
-  const StudentScoresView({Key? key}) : super(key: key);
+  const StudentScoresView({super.key});
 
   @override
   _StudentScoresViewState createState() => _StudentScoresViewState();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/student_announcement_view.dart';
 import 'package:hcd_project2/student_placement_view.dart';
+import 'package:hcd_project2/company_details_page.dart';
 import 'package:hcd_project2/student_quiz_view.dart';
 import 'package:hcd_project2/student_mentorship_view.dart';
 import 'package:hcd_project2/job_listings_view.dart';
@@ -31,6 +32,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
   List<EmailMessage>? _emails;
   String? _errorMessage;
   bool _showEmails = false;
+  bool _showCompanyDetails = false;  // New state for company details view
   
   // Function to open email in Gmail
   Future<void> _openEmailInGmail(String emailId) async {
@@ -166,10 +168,166 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
   }
 
-  void _toggleEmailView() {
+  void _showCompanyDetailsView() {
     setState(() {
-      _showEmails = !_showEmails;
+      _showCompanyDetails = true;
+      _showEmails = false;
     });
+  }
+
+  void _showEmailsView() {
+    setState(() {
+      _showEmails = true;
+      _showCompanyDetails = false;
+    });
+  }
+
+  void _backToDashboard() {
+    setState(() {
+      _showEmails = false;
+      _showCompanyDetails = false;
+    });
+  }
+
+  Widget _buildCompanyDetailsOptions() {
+    return Container(
+  padding: const EdgeInsets.all(24),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: const BorderRadius.only(
+      topLeft: Radius.circular(30),
+      topRight: Radius.circular(30),
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.1),
+        spreadRadius: 1,
+        blurRadius: 10,
+      ),
+    ],
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Company Details',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _backToDashboard,
+          ),
+        ],
+      ),
+      const SizedBox(height: 32),
+      Expanded(
+        child: ListView(
+          children: [
+            _buildCompanyOptionCard(
+              'Company Information',
+              'View detailed information about companies',
+              Icons.business,
+              Colors.blue,
+              () {
+                // Navigate to company information page
+                // You can create a new page or show company details here
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Company Information feature coming soon!'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20), // Add spacing between cards
+            _buildCompanyOptionCard(
+              'All Mails',
+              'View all company emails and communications',
+              Icons.email,
+              Colors.green,
+              () {
+                _showEmailsView();
+              },
+            ),
+          ],
+        ),
+      ),
+    ],
+  ),
+);
+  }
+
+  Widget _buildCompanyOptionCard(
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 32,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.grey[400],
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEmailList() {
@@ -382,17 +540,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     children: [
                       const SizedBox(height: 40),
                       Row(
-  children: [
-    Flexible(
-      child: Text(
-        '${widget.userName}\'s Dashboard',
-        overflow: TextOverflow.ellipsis, // optional
-        style: TextStyle(fontSize: 25),
-      ),
-    ),
-  ],
-),
-
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${widget.userName}\'s Dashboard',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 25, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       const Text(
                         'Track Placement Progress',
@@ -406,178 +563,186 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: _showEmails 
-                    ? Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(30),
-                            topRight: Radius.circular(30),
+                  child: _showCompanyDetails 
+                    ? _buildCompanyDetailsOptions()
+                    : _showEmails 
+                      ? Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(30),
+                              topRight: Radius.circular(30),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 10,
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Company Emails',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Company Emails',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back),
-                                  onPressed: _toggleEmailView,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: _isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : SingleChildScrollView(
-                                    child: _buildEmailList(),
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: _showCompanyDetailsView,
                                   ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(30),
-                            topRight: Radius.circular(30),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: _isLoading
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : SingleChildScrollView(
+                                      child: _buildEmailList(),
+                                    ),
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 10,
+                        )
+                      : Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(30),
+                              topRight: Radius.circular(30),
                             ),
-                          ],
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              int crossAxisCount =
+                                  constraints.maxWidth > 600 ? 3 : 2;
+                              return GridView.count(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                shrinkWrap: true,
+                                // Allow scrolling within the grid
+                                physics: const ScrollPhysics(),
+                                children: [
+                                  _buildCardButton(
+                                    context,
+                                    'Company Details',
+                                    Icons.business,
+                                    Colors.blue,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const CompanyDetailsPage(),
+                                        ),
+                                      );
+                                    },
+                                    _isLoading,
+                                    _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    "Placement History",
+                                    Icons.history,
+                                    Colors.green,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentPlacementHistoryPage(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Announcements',
+                                    Icons.campaign,
+                                    Colors.blue,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentAnnouncementView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Ask Alumni',
+                                    Icons.school,
+                                    Colors.purple,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentMentorshipView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Quizzes',
+                                    Icons.quiz,
+                                    Colors.orange,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const StudentQuizView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Resume upload',
+                                    Icons.upload_file,
+                                    Colors.brown,
+                                    () {},
+                                  ),
+                                  _buildCardButton(
+                                    context,
+                                    'Alumni Careers',
+                                    Icons.work,
+                                    Colors.teal,
+                                    () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const JobListingsView(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            int crossAxisCount =
-                                constraints.maxWidth > 600 ? 3 : 2;
-                            return GridView.count(
-                              crossAxisCount: crossAxisCount,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              shrinkWrap: true,
-                              // Allow scrolling within the grid
-                              physics: const ScrollPhysics(),
-                              children: [
-                                _buildCardButton(
-                                  context,
-                                  'Company Details',
-                                  Icons.business,
-                                  Colors.blue,
-                                  () {
-                                    _toggleEmailView();
-                                  },
-                                  _isLoading,
-                                  _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  "Placement History",
-                                  Icons.history,
-                                  Colors.green,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentPlacementHistoryPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Announcements',
-                                  Icons.campaign,
-                                  Colors.blue,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentAnnouncementView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Ask Alumni',
-                                  Icons.school,
-                                  Colors.purple,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentMentorshipView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Quizzes',
-                                  Icons.quiz,
-                                  Colors.orange,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentQuizView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Resume upload',
-                                  Icons.upload_file,
-                                  Colors.brown,
-                                  () {},
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Alumni Careers',
-                                  Icons.work,
-                                  Colors.teal,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const JobListingsView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
                 ),
               ],
             ),

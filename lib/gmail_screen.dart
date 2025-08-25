@@ -6,7 +6,7 @@ import 'package:hcd_project2/firebase_email_service.dart';
 class GmailScreen extends StatefulWidget {
   final List<EmailMessage>? initialEmails;
   
-  const GmailScreen({Key? key, this.initialEmails}) : super(key: key);
+  const GmailScreen({super.key, this.initialEmails});
 
   @override
   _GmailScreenState createState() => _GmailScreenState();

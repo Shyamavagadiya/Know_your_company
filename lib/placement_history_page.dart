@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class PlacementHistoryPage extends StatefulWidget {
-  const PlacementHistoryPage({Key? key}) : super(key: key);
+  const PlacementHistoryPage({super.key});
 
   @override
   State<PlacementHistoryPage> createState() => _PlacementHistoryPageState();

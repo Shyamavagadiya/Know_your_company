@@ -63,9 +63,7 @@ class GmailService {
     GoogleSignInAccount? googleUser = _googleSignIn.currentUser;
     
     // If not available, try silent sign-in
-    if (googleUser == null) {
-      googleUser = await _googleSignIn.signInSilently();
-    }
+    googleUser ??= await _googleSignIn.signInSilently();
     
     return googleUser;
   }
@@ -85,9 +83,7 @@ class GmailService {
         googleUser = await _googleSignIn.signInSilently();
         
         // If silent sign-in fails, use regular sign-in
-        if (googleUser == null) {
-          googleUser = await _googleSignIn.signIn();
-        }
+        googleUser ??= await _googleSignIn.signIn();
       } else {
         // For mobile, continue using the regular approach
         googleUser = await _googleSignIn.signIn();
@@ -264,7 +260,7 @@ class GmailService {
       final credentials = AccessCredentials(
         AccessToken(
           'Bearer', 
-          accessToken!, 
+          accessToken, 
           tokenExpiry
         ),
         refreshToken, // Include refresh token if available

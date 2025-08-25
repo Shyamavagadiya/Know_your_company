@@ -26,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _obscurePassword = true; // Add this for password visibility toggle
 
   // Define the primary color to match the first file's design
   final Color primaryColor = const Color.fromARGB(255, 0, 166, 190);
@@ -347,8 +348,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     String selectedRole = 'student'; // Default role
+    bool obscurePassword = true; // Add password visibility toggle for dialog
+    bool obscureConfirmPassword = true; // Add confirm password visibility toggle
 
-    final List<String> _roles = [
+    final List<String> roles = [
       'student',
       'faculty',
       'hod',
@@ -356,166 +359,194 @@ class _LoginScreenState extends State<LoginScreen> {
       'alumni',
     ];
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.grey[50],
-      title: Text(
-        'Complete Your Profile',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Email:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            Text(email, style: TextStyle(fontSize: 14)),
-            const SizedBox(height: 16),
-
-            // Full Name field
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(Icons.person, color: primaryColor),
-                hintText: 'Full Name',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Password field
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(Icons.lock, color: primaryColor),
-                hintText: 'Password',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Confirm Password field
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
-                hintText: 'Confirm Password',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Role field
-            Column(
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.grey[50],
+          title: Text(
+            'Complete Your Profile',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Role',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  'Email:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedRole,
-                      isExpanded: true,
-                      icon: const Icon(Icons.arrow_drop_down),
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          selectedRole = newValue;
-                        }
-                      },
-                      items:
-                          _roles.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Row(
-                            children: [
-                              Icon(Icons.badge, color: primaryColor),
-                              SizedBox(width: 10),
-                              Text(value),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                Text(email, style: TextStyle(fontSize: 14)),
+                const SizedBox(height: 16),
+
+                // Full Name field
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    prefixIcon: Icon(Icons.person, color: primaryColor),
+                    hintText: 'Full Name',
                   ),
+                ),
+                const SizedBox(height: 16),
+
+                // Password field with toggle
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: Icon(Icons.lock, color: primaryColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        color: primaryColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscurePassword = !obscurePassword;
+                        });
+                      },
+                    ),
+                    hintText: 'Password',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Confirm Password field with toggle
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        color: primaryColor,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscureConfirmPassword = !obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                    hintText: 'Confirm Password',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Role field
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Role',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedRole,
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down),
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          onChanged: (String? newValue) {
+                            if (newValue != null) {
+                              setState(() {
+                                selectedRole = newValue;
+                              });
+                            }
+                          },
+                          items:
+                              roles.map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.badge, color: primaryColor),
+                                  SizedBox(width: 10),
+                                  Text(value),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel', style: TextStyle(color: Colors.grey[800])),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            // Validate inputs
-            if (nameController.text.trim().isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter your name')),
-              );
-              return;
-            }
-
-            if (passwordController.text.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a password')),
-              );
-              return;
-            }
-
-            if (passwordController.text != confirmPasswordController.text) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Passwords do not match')),
-              );
-              return;
-            }
-
-            if (passwordController.text.length < 6) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Password must be at least 6 characters'),
-                ),
-              );
-              return;
-            }
-
-            // Return the collected information
-            Navigator.of(context).pop({
-              'name': nameController.text.trim(),
-              'password': passwordController.text,
-              'role': selectedRole,
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
           ),
-          child: const Text('Submit'),
-        ),
-      ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[800])),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validate inputs
+                if (nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter your name')),
+                  );
+                  return;
+                }
+
+                if (passwordController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a password')),
+                  );
+                  return;
+                }
+
+                if (passwordController.text != confirmPasswordController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Passwords do not match')),
+                  );
+                  return;
+                }
+
+                if (passwordController.text.length < 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password must be at least 6 characters'),
+                    ),
+                  );
+                  return;
+                }
+
+                // Return the collected information
+                Navigator.of(context).pop({
+                  'name': nameController.text.trim(),
+                  'password': passwordController.text,
+                  'role': selectedRole,
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -576,13 +607,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
                           TextFormField(
                             controller: _passwordController,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               labelText: 'Password',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               prefixIcon: Icon(Icons.lock, color: primaryColor),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                  color: primaryColor,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {

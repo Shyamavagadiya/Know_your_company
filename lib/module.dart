@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Module extends StatefulWidget {
+  const Module({super.key});
+
   @override
   _ModuleViewState createState() => _ModuleViewState();
 }
@@ -669,11 +671,11 @@ class QuizDetailPage extends StatefulWidget {
   final String quizName;
 
   const QuizDetailPage({
-    Key? key,
+    super.key,
     required this.moduleId,
     required this.quizId,
     required this.quizName,
-  }) : super(key: key);
+  });
 
   @override
   _QuizDetailPageState createState() => _QuizDetailPageState();

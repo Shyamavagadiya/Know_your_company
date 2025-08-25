@@ -4,7 +4,7 @@ import 'package:hcd_project2/models/job_experience.dart';
 import 'package:hcd_project2/services/job_experience_service.dart';
 
 class JobListingsView extends StatefulWidget {
-  const JobListingsView({Key? key}) : super(key: key);
+  const JobListingsView({super.key});
 
   @override
   State<JobListingsView> createState() => _JobListingsViewState();
@@ -165,7 +165,7 @@ class _JobListingsViewState extends State<JobListingsView> {
                               value: company,
                               child: Text(company),
                             );
-                          }).toList(),
+                          }),
                         ],
                         onChanged: (value) {
                           setState(() {

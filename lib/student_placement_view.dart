@@ -7,7 +7,7 @@ import 'package:hcd_project2/models/round_model.dart';
 import 'package:hcd_project2/models/student_round_progress_model.dart';
 
 class StudentPlacementHistoryPage extends StatefulWidget {
-  const StudentPlacementHistoryPage({Key? key}) : super(key: key);
+  const StudentPlacementHistoryPage({super.key});
 
   @override
   State<StudentPlacementHistoryPage> createState() => _StudentPlacementHistoryPageState();
@@ -29,10 +29,10 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   bool _isRegistering = false;
   
   // Rounds management
-  Map<String, List<Round>> _companyRounds = {};
-  Map<String, Map<String, bool>> _roundCompletionStatus = {};
-  Map<String, Map<String, bool>> _roundPassStatus = {}; // Track if rounds were passed or failed
-  TextEditingController _roundNotesController = TextEditingController(); // For round result notes
+  final Map<String, List<Round>> _companyRounds = {};
+  final Map<String, Map<String, bool>> _roundCompletionStatus = {};
+  final Map<String, Map<String, bool>> _roundPassStatus = {}; // Track if rounds were passed or failed
+  final TextEditingController _roundNotesController = TextEditingController(); // For round result notes
   bool _isLoadingRounds = false;
   bool _isCompletingRound = false;
   
@@ -186,7 +186,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
                 Text('Students selected: $selectedStudents'),
                 SizedBox(height: 8),
                 Text('Selection rate: ${totalStudents > 0 
-                  ? (selectedStudents / totalStudents * 100).toStringAsFixed(1) + '%' 
+                  ? '${(selectedStudents / totalStudents * 100).toStringAsFixed(1)}%' 
                   : 'N/A'}'),
                 
                 SizedBox(height: 16),
@@ -302,7 +302,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         builder: (context) {
           return AlertDialog(
             title: Text('Your Selection History'),
-            content: Container(
+            content: SizedBox(
               width: double.maxFinite,
               child: ListView.builder(
                 shrinkWrap: true,
@@ -745,11 +745,37 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
       _showErrorMessage('User not authenticated');
       return;
     }
-    
+
+    // Show confirmation dialog before registering
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Registration'),
+          content: const Text('Are you sure you want to register? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false), // Not confirmed
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true), // Confirmed
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // If user did not confirm, do nothing
+    if (confirmed != true) {
+      return;
+    }
+
     setState(() {
       _isRegistering = true;
     });
-    
+
     try {
       // Add registration to the company_registrations collection
       await FirebaseFirestore.instance.collection('company_registrations').add({
@@ -758,10 +784,10 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'pending', // Could be 'pending', 'approved', 'rejected'
       });
-      
+
       // Refresh the list of available companies
       await _loadAvailableCompanies();
-      
+
       _showSuccessMessage('Successfully registered for the company');
     } catch (e) {
       _showErrorMessage('Failed to register: ${e.toString()}');
@@ -772,135 +798,97 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
     }
   }
   
-  // Cancel registration for a company
-  Future<void> _cancelRegistration(String registrationId) async {
-    setState(() {
-      _isRegistering = true;
-    });
-    
-    try {
-      // Delete the registration document
-      await FirebaseFirestore.instance
-          .collection('company_registrations')
-          .doc(registrationId)
-          .delete();
-      
-      // Refresh the list of available companies
-      await _loadAvailableCompanies();
-      
-      _showSuccessMessage('Registration cancelled successfully');
-    } catch (e) {
-      _showErrorMessage('Failed to cancel registration: ${e.toString()}');
-    } finally {
-      setState(() {
-        _isRegistering = false;
-      });
-    }
+  // Build the company registration section
+  // Build the company registration section
+Widget _buildCompanyRegistrationSection() {
+  if (_isLoadingCompanies) {
+    return const Center(child: CircularProgressIndicator());
   }
   
-  // Build the company registration section
-  Widget _buildCompanyRegistrationSection() {
-    if (_isLoadingCompanies) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_availableCompanies.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
-              'No companies available for registration',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Check back later for new opportunities',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _loadAvailableCompanies,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A6BE),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    return ListView.builder(
-      itemCount: _availableCompanies.length,
-      padding: const EdgeInsets.all(16),
-      itemBuilder: (context, index) {
-        final company = _availableCompanies[index];
-        final bool isRegistered = company['isRegistered'] ?? false;
-        final String? registrationId = company['registrationId'];
-        
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  if (_availableCompanies.isEmpty) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'No companies available for registration',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                title: Text(
-                  company['name'],
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
+          const SizedBox(height: 8),
+          const Text(
+            'Check back later for new opportunities',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadAvailableCompanies,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00A6BE),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  return ListView.builder(
+    itemCount: _availableCompanies.length,
+    padding: const EdgeInsets.all(16),
+    itemBuilder: (context, index) {
+      final company = _availableCompanies[index];
+      final bool isRegistered = company['isRegistered'] ?? false;
+      final String? registrationId = company['registrationId'];
+      
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              title: Text(
+                company['name'],
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isRegistered 
-                          ? 'Status: Registered' 
-                          : 'Status: Open for Registration',
-                      style: TextStyle(
-                        color: isRegistered ? Colors.green : Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status text
+                  Text(
+                    isRegistered 
+                        ? 'Status: Registered' 
+                        : 'Status: Open for Registration',
+                    style: TextStyle(
+                      color: isRegistered ? Colors.green : Colors.blue,
+                      fontWeight: FontWeight.bold,
                     ),
-                    if (isRegistered)
-                      ElevatedButton(
-                        onPressed: _isRegistering 
-                            ? null 
-                            : () => _cancelRegistration(registrationId!),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: _isRegistering
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Cancel Registration'),
-                      )
-                    else
-                      ElevatedButton(
+                  ),
+                  
+                  // Register button (only show if not registered)
+                  if (!isRegistered) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
                         onPressed: _isRegistering 
                             ? null 
                             : () => _registerForCompany(company['id']),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00A6BE),
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: _isRegistering
                             ? const SizedBox(
@@ -913,16 +901,17 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
                               )
                             : const Text('Register'),
                       ),
+                    ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -6,7 +6,7 @@ import 'package:hcd_project2/models/job_experience.dart';
 import 'package:hcd_project2/services/job_experience_service.dart';
 
 class AlumniJobListingsView extends StatefulWidget {
-  const AlumniJobListingsView({Key? key}) : super(key: key);
+  const AlumniJobListingsView({super.key});
 
   @override
   State<AlumniJobListingsView> createState() => _AlumniJobListingsViewState();

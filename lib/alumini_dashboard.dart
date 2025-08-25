@@ -7,8 +7,8 @@ import 'package:hcd_project2/alumni_networking_view.dart';
 
 class AlumniDashboard extends StatelessWidget {
   const AlumniDashboard({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {

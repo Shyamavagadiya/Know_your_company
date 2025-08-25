@@ -7,14 +7,11 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // Constructor that sets persistence
+  // Constructor - Firebase Auth handles persistence automatically on mobile
   AuthService() {
-    // Firebase Auth on web already uses LOCAL persistence by default
-    // For mobile platforms, this is also the default
-    // This ensures the user stays logged in even after app restart
-    if (!kIsWeb) {
-      _auth.setPersistence(Persistence.LOCAL);
-    }
+    // No need to set persistence - Firebase Auth automatically persists sessions
+    // on mobile platforms. On web, LOCAL persistence is the default.
+    // Removing setPersistence() call to avoid mobile platform errors.
   }
   
   // Check if a user exists in Firestore by email
