@@ -10,7 +10,7 @@ import 'package:hcd_project2/user_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-// Page to display registered students for a company
+// Keep the existing RegisteredStudentsPage and RoundResultsPage unchanged
 class RegisteredStudentsPage extends StatelessWidget {
   final String companyName;
   final List<Map<String, dynamic>> students;
@@ -64,7 +64,6 @@ class RegisteredStudentsPage extends StatelessWidget {
   }
 }
 
-// Page to display round results
 class RoundResultsPage extends StatelessWidget {
   final String companyName;
   final String roundName;
@@ -232,15 +231,15 @@ class PlacementCoordinatorDashboard extends StatefulWidget {
   State<PlacementCoordinatorDashboard> createState() => _PlacementCoordinatorDashboardState();
 }
 
-class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDashboard> with SingleTickerProviderStateMixin {
+class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDashboard> {
   // Services
   final NotificationService _notificationService = NotificationService();
   final FirebaseEmailService _firebaseEmailService = FirebaseEmailService();
   final GmailService _gmailService = GmailService();
   final RoundService _roundService = RoundService();
   
-  // Tab controller
-  late TabController _tabController;
+  // Current view state
+  String _currentView = 'main'; // 'main', 'emails', 'companies', 'add_company', 'rounds'
   
   // Email management
   bool _isLoading = false;
@@ -271,9 +270,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   @override
   void initState() {
     super.initState();
-    // Initialize tab controller with 4 tabs
-    _tabController = TabController(length: 4, vsync: this);
-    
     _initializeNotifications();
     _loadEmails();
     _loadCompanies();
@@ -283,7 +279,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   void dispose() {
     _companyNameController.dispose();
     _roundNameController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
   
@@ -292,7 +287,20 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     await _notificationService.initialize();
   }
   
-  // Email Management Methods
+  // Navigation methods
+  void _navigateToView(String view) {
+    setState(() {
+      _currentView = view;
+    });
+  }
+  
+  void _navigateBack() {
+    setState(() {
+      _currentView = 'main';
+    });
+  }
+  
+  // Email Management Methods (keeping existing logic)
   Future<void> _loadEmails() async {
     setState(() {
       _isLoading = true;
@@ -319,8 +327,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     });
     
     try {
-      // Use the appropriate method from your GmailService
-      // This is a placeholder - replace with your actual method
       await _gmailService.fetchEmails();
       await _loadEmails();
     } catch (e) {
@@ -364,7 +370,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     );
   }
   
-  // Company Management Methods
+  // Company Management Methods (keeping existing logic)
   Future<void> _loadCompanies() async {
     setState(() {
       _isLoadingCompanies = true;
@@ -421,20 +427,15 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     });
     
     try {
-      // Add company to Firestore
-      final companyRef = await FirebaseFirestore.instance.collection('companies').add({
+      await FirebaseFirestore.instance.collection('companies').add({
         'name': _companyNameController.text.trim(),
         'createdAt': Timestamp.now(),
         'isRegistrationOpen': true,
       });
       
-      // Clear the text field
       _companyNameController.clear();
-      
-      // Reload companies
       await _loadCompanies();
       
-      // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -444,8 +445,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         );
       }
       
-      // Switch to companies tab
-      _tabController.animateTo(2);
+      _navigateToView('companies');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -462,9 +462,8 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
-  // Delete company method
+  // Delete company method (keeping existing logic)
   Future<void> _deleteCompany(String companyId, String companyName) async {
-    // Show confirmation dialog
     final bool confirmDelete = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -486,10 +485,8 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     if (!confirmDelete) return;
     
     try {
-      // Delete the company
       await FirebaseFirestore.instance.collection('companies').doc(companyId).delete();
       
-      // Delete all registrations for this company
       final registrationsSnapshot = await FirebaseFirestore.instance
           .collection('company_registrations')
           .where('companyId', isEqualTo: companyId)
@@ -499,7 +496,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         await doc.reference.delete();
       }
       
-      // Delete all rounds for this company
       final roundsSnapshot = await FirebaseFirestore.instance
           .collection('rounds')
           .where('companyId', isEqualTo: companyId)
@@ -509,7 +505,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         await doc.reference.delete();
       }
       
-      // Delete all student round progress for this company
       final progressSnapshot = await FirebaseFirestore.instance
           .collection('studentRoundProgress')
           .where('companyId', isEqualTo: companyId)
@@ -519,7 +514,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         await doc.reference.delete();
       }
       
-      // Reload companies
       await _loadCompanies();
       
       if (mounted) {
@@ -542,15 +536,13 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
-  // Toggle registration status
+  // Toggle registration status (keeping existing logic)
   Future<void> _toggleRegistrationStatus(String companyId, String companyName, bool currentStatus) async {
     try {
-      // Update the company's registration status
       await FirebaseFirestore.instance.collection('companies').doc(companyId).update({
         'isRegistrationOpen': !currentStatus,
       });
       
-      // Reload companies
       await _loadCompanies();
       
       if (mounted) {
@@ -573,7 +565,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
-  // Student Management Methods
+  // Student Management Methods (keeping existing logic)
   Future<void> _viewRegisteredStudents(String companyId, String companyName) async {
     setState(() {
       _isLoadingStudents = true;
@@ -583,7 +575,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     });
     
     try {
-      // Get registered students from Firestore
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('company_registrations')
           .where('companyId', isEqualTo: companyId)
@@ -595,7 +586,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         final data = doc.data() as Map<String, dynamic>;
         final studentId = data['studentId'];
         
-        // Get student details
         final studentDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(studentId)
@@ -618,7 +608,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         _isLoadingStudents = false;
       });
       
-      // Navigate to the students page
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -644,7 +633,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
-  // Rounds Management Methods
+  // Rounds Management Methods (keeping existing logic)
   void _manageRounds(String companyId, String companyName) async {
     setState(() {
       _isLoadingRounds = true;
@@ -654,7 +643,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     });
     
     try {
-      // Load rounds for this company
       final rounds = await _roundService.getRoundsForCompany(companyId);
       
       setState(() {
@@ -662,8 +650,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         _isLoadingRounds = false;
       });
       
-      // Switch to the Rounds tab
-      _tabController.animateTo(3);
+      _navigateToView('rounds');
     } catch (e) {
       setState(() {
         _isLoadingRounds = false;
@@ -711,7 +698,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                       return;
                     }
                     
-                    // Check if name is "Placed" which is reserved
                     if (_roundNameController.text.toLowerCase() == 'placed') {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -735,7 +721,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                       _roundNameController.clear();
                       Navigator.pop(context);
                       
-                      // Reload rounds
                       final updatedRounds = await _roundService.getRoundsForCompany(_selectedCompanyId!);
                       
                       setState(() {
@@ -777,10 +762,9 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     );
   }
   
-  // Load round results for students
+  // Load round results for students (keeping existing logic)
   Future<List<Map<String, dynamic>>> _loadRoundResults(String companyId, String roundId) async {
     try {
-      // Get all student progress documents for this round
       final QuerySnapshot snapshot = await FirebaseFirestore.instance
           .collection('student_round_progress')
           .where('companyId', isEqualTo: companyId)
@@ -793,7 +777,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         final data = doc.data() as Map<String, dynamic>;
         final studentId = data['studentId'];
         
-        // Get student details
         final studentDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(studentId)
@@ -811,7 +794,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         }
       }
       
-      // Sort by completion date (most recent first)
       results.sort((a, b) {
         final aDate = a['completedAt'] as Timestamp;
         final bDate = b['completedAt'] as Timestamp;
@@ -826,7 +808,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   }
   
   void _viewRoundResults(String roundId, String roundName) async {
-    // Load results and navigate to the results page
     final results = await _loadRoundResults(_selectedCompanyId!, roundId);
     
     if (mounted) {
@@ -843,36 +824,176 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
-  // Tab Pages
-  Widget _buildEmailManagementPage() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
+  // Build card button similar to student dashboard
+  Widget _buildCardButton(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap, [
+    bool isLoading = false,
+    String? badge,
+  ]) {
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'Placement Emails',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF00A6BE),
-                ),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: isLoading
+                        ? SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: color,
+                            ),
+                          )
+                        : Icon(
+                            icon,
+                            size: 32,
+                            color: color,
+                          ),
+                  ),
+                  if (badge != null)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          badge,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              ElevatedButton.icon(
-                onPressed: _isConnectingGmail ? null : _connectGmailAccount,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh Emails'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00A6BE),
-                  foregroundColor: Colors.white,
+              const SizedBox(height: 12),
+              Flexible(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  softWrap: true,
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+  
+  // Main dashboard view
+  Widget _buildMainDashboard() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          shrinkWrap: true,
+          physics: const ScrollPhysics(),
+          children: [
+            _buildCardButton(
+              'Emails',
+              Icons.email,
+              Colors.blue,
+              () => _navigateToView('emails'),
+              _isLoading,
+              _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
+            ),
+            _buildCardButton(
+              'Add Company',
+              Icons.add_business,
+              Colors.green,
+              () => _navigateToView('add_company'),
+              _isAddingCompany,
+            ),
+            _buildCardButton(
+              'Companies',
+              Icons.business,
+              Colors.orange,
+              () => _navigateToView('companies'),
+              _isLoadingCompanies,
+              _companies.isNotEmpty ? _companies.length.toString() : null,
+            ),
+            _buildCardButton(
+              'Rounds',
+              Icons.format_list_numbered,
+              Colors.purple,
+              () {
+                if (_selectedCompanyId != null) {
+                  _navigateToView('rounds');
+                } else {
+                  _navigateToView('companies');
+                }
+              },
+              _isLoadingRounds,
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Email management view
+  Widget _buildEmailManagementView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Placement Emails',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: _isConnectingGmail ? null : _connectGmailAccount,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A6BE),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -905,7 +1026,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                           itemBuilder: (context, index) {
                             final email = _emails![index];
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                               elevation: 3,
                               child: ListTile(
                                 leading: const CircleAvatar(
@@ -920,9 +1041,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('From: ${email.from}'),
-                                    Text(
-                                      'Date: ${email.date}',
-                                    ),
+                                    Text('Date: ${email.date}'),
                                   ],
                                 ),
                                 isThreeLine: true,
@@ -936,133 +1055,149 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     );
   }
   
-  Widget _buildAddCompanyPage() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Add New Company',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF00A6BE),
-            ),
+  // Add company view
+  Widget _buildAddCompanyView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Add New Company',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _companyNameController,
-            decoration: const InputDecoration(
-              labelText: 'Company Name',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.business),
-            ),
+        ),
+        const SizedBox(height: 32),
+        TextField(
+          controller: _companyNameController,
+          decoration: const InputDecoration(
+            labelText: 'Company Name',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.business),
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isAddingCompany ? null : _addCompany,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A6BE),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isAddingCompany ? null : _addCompany,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00A6BE),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: _isAddingCompany
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Add Company'),
             ),
+            child: _isAddingCompany
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Add Company', style: TextStyle(fontSize: 16)),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   
-  Widget _buildCompaniesListPage() {
-    return _isLoadingCompanies
-        ? const Center(child: CircularProgressIndicator())
-        : _companies.isEmpty
-            ? const Center(child: Text('No companies found'))
-            : ListView.builder(
-                itemCount: _companies.length,
-                itemBuilder: (context, index) {
-                  final company = _companies[index];
-                  final bool isRegistrationOpen = company['isRegistrationOpen'] ?? true;
-                  
-                  return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 3,
-                    child: Column(
-                      children: [
-                        ListTile(
-                          title: Row(
+  // Companies list view
+  Widget _buildCompaniesView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Companies',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: _isLoadingCompanies
+              ? const Center(child: CircularProgressIndicator())
+              : _companies.isEmpty
+                  ? const Center(child: Text('No companies found'))
+                  : ListView.builder(
+                      itemCount: _companies.length,
+                      itemBuilder: (context, index) {
+                        final company = _companies[index];
+                        final bool isRegistrationOpen = company['isRegistrationOpen'] ?? true;
+                        
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          elevation: 3,
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  company['name'],
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                              ListTile(
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        company['name'],
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isRegistrationOpen ? Colors.green.shade100 : Colors.red.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        isRegistrationOpen ? 'Open' : 'Closed',
+                                        style: TextStyle(
+                                          color: isRegistrationOpen ? Colors.green.shade800 : Colors.red.shade800,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Text(
+                                  'Registered: ${DateFormat('MMM d, yyyy').format(company['createdAt'].toDate())}',
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isRegistrationOpen ? Colors.green.shade100 : Colors.red.shade100,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  isRegistrationOpen ? 'Open' : 'Closed',
-                                  style: TextStyle(
-                                    color: isRegistrationOpen ? Colors.green.shade800 : Colors.red.shade800,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildActionButton(
+                                      icon: Icons.people,
+                                      label: 'Students',
+                                      onPressed: () => _viewRegisteredStudents(company['id'], company['name']),
+                                    ),
+                                    _buildActionButton(
+                                      icon: Icons.format_list_numbered,
+                                      label: 'Rounds',
+                                      onPressed: () => _manageRounds(company['id'], company['name']),
+                                    ),
+                                    _buildActionButton(
+                                      icon: isRegistrationOpen ? Icons.lock : Icons.lock_open,
+                                      label: isRegistrationOpen ? 'Close' : 'Open',
+                                      onPressed: () => _toggleRegistrationStatus(
+                                        company['id'],
+                                        company['name'],
+                                        isRegistrationOpen,
+                                      ),
+                                    ),
+                                    _buildActionButton(
+                                      icon: Icons.delete,
+                                      label: 'Delete',
+                                      color: Colors.red,
+                                      onPressed: () => _deleteCompany(company['id'], company['name']),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                          subtitle: Text(
-                            'Registered: ${DateFormat('MMM d, yyyy').format(company['createdAt'].toDate())}',
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildActionButton(
-                                icon: Icons.people,
-                                label: 'Students',
-                                onPressed: () => _viewRegisteredStudents(company['id'], company['name']),
-                              ),
-                              _buildActionButton(
-                                icon: Icons.format_list_numbered,
-                                label: 'Rounds',
-                                onPressed: () => _manageRounds(company['id'], company['name']),
-                              ),
-                              _buildActionButton(
-                                icon: isRegistrationOpen ? Icons.lock : Icons.lock_open,
-                                label: isRegistrationOpen ? 'Close' : 'Open',
-                                onPressed: () => _toggleRegistrationStatus(
-                                  company['id'],
-                                  company['name'],
-                                  isRegistrationOpen,
-                                ),
-                              ),
-                              _buildActionButton(
-                                icon: Icons.delete,
-                                label: 'Delete',
-                                color: Colors.red,
-                                onPressed: () => _deleteCompany(company['id'], company['name']),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  );
-                },
-              );
+        ),
+      ],
+    );
   }
   
   Widget _buildActionButton({
@@ -1091,7 +1226,8 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     );
   }
   
-  Widget _buildRoundsPage() {
+  // Rounds view
+  Widget _buildRoundsView() {
     if (_selectedCompanyId == null) {
       return Center(
         child: Column(
@@ -1100,14 +1236,14 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
             const Icon(Icons.format_list_numbered, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             const Text(
-              'Select a company from the Companies tab to manage rounds',
+              'Select a company from the Companies section to manage rounds',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                _tabController.animateTo(2); // Switch to Companies tab
+                _navigateToView('companies');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00A6BE),
@@ -1123,41 +1259,29 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  setState(() {
-                    _selectedCompanyId = null;
-                    _selectedCompanyName = null;
-                    _companyRounds = [];
-                  });
-                },
-              ),
-              Expanded(
-                child: Text(
-                  'Rounds for $_selectedCompanyName',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Rounds for $_selectedCompanyName',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: _isAddingRound ? null : () => _showAddRoundDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Round'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00A6BE),
-                  foregroundColor: Colors.white,
-                ),
+            ),
+            ElevatedButton.icon(
+              onPressed: _isAddingRound ? null : () => _showAddRoundDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Round'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A6BE),
+                foregroundColor: Colors.white,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+        const SizedBox(height: 16),
         Expanded(
           child: _isLoadingRounds
               ? const Center(child: CircularProgressIndicator())
@@ -1168,7 +1292,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                       itemBuilder: (context, index) {
                         final round = _companyRounds[index];
                         return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          margin: const EdgeInsets.symmetric(vertical: 8),
                           elevation: 3,
                           child: ListTile(
                             leading: CircleAvatar(
@@ -1196,24 +1320,25 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     );
   }
   
+  // Main view selector
+  Widget _buildCurrentView() {
+    switch (_currentView) {
+      case 'emails':
+        return _buildEmailManagementView();
+      case 'add_company':
+        return _buildAddCompanyView();
+      case 'companies':
+        return _buildCompaniesView();
+      case 'rounds':
+        return _buildRoundsView();
+      default:
+        return _buildMainDashboard();
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Welcome, ${widget.userName}'),
-        backgroundColor: const Color(0xFF00A6BE),
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(icon: Icon(Icons.email), text: 'Emails'),
-            Tab(icon: Icon(Icons.add_business), text: 'Add Company'),
-            Tab(icon: Icon(Icons.business), text: 'Companies'),
-            Tab(icon: Icon(Icons.format_list_numbered), text: 'Rounds'),
-          ],
-        ),
-      ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -1258,10 +1383,18 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               ),
             ),
             ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Dashboard'),
+              onTap: () {
+                _navigateToView('main');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.email),
               title: const Text('Email Management'),
               onTap: () {
-                _tabController.animateTo(0); // Go to emails tab
+                _navigateToView('emails');
                 Navigator.pop(context);
               },
             ),
@@ -1269,7 +1402,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               leading: const Icon(Icons.add_business),
               title: const Text('Add Company'),
               onTap: () {
-                _tabController.animateTo(1); // Go to add company tab
+                _navigateToView('add_company');
                 Navigator.pop(context);
               },
             ),
@@ -1277,7 +1410,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               leading: const Icon(Icons.business),
               title: const Text('Companies'),
               onTap: () {
-                _tabController.animateTo(2); // Go to companies tab
+                _navigateToView('companies');
                 Navigator.pop(context);
               },
             ),
@@ -1285,7 +1418,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               leading: const Icon(Icons.format_list_numbered),
               title: const Text('Rounds'),
               onTap: () {
-                _tabController.animateTo(3); // Go to rounds tab
+                _navigateToView('rounds');
                 Navigator.pop(context);
               },
             ),
@@ -1318,19 +1451,154 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Stack(
         children: [
-          // Tab 1: Email Management Page
-          _buildEmailManagementPage(),
-          // Tab 2: Add Company Page
-          _buildAddCompanyPage(),
-          // Tab 3: Companies List Page
-          _buildCompaniesListPage(),
-          // Tab 4: Rounds Management Page
-          _buildRoundsPage(),
+          // Gradient background like student dashboard
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.fromARGB(255, 0, 166, 190),
+                  Color.fromARGB(255, 0, 140, 160),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header section
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 40),
+                      Row(
+                        children: [
+                          if (_currentView != 'main')
+                            IconButton(
+                              onPressed: _navigateBack,
+                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            ),
+                          Expanded(
+                            child: Text(
+                              _currentView == 'main' 
+                                  ? '${widget.userName}\'s Dashboard'
+                                  : _getViewTitle(),
+                              style: const TextStyle(
+                                fontSize: 25,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _getViewSubtitle(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Main content area with white container
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: _buildCurrentView(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Menu button
+          Positioned(
+            top: 30,
+            left: 10,
+            child: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white, size: 30),
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+              ),
+            ),
+          ),
+          // Refresh button
+          Positioned(
+            bottom: 30,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: () {
+                if (_currentView == 'emails') {
+                  _loadEmails();
+                } else if (_currentView == 'companies') {
+                  _loadCompanies();
+                } else {
+                  // Refresh all data
+                  _loadEmails();
+                  _loadCompanies();
+                }
+              },
+              backgroundColor: const Color.fromARGB(255, 0, 166, 190),
+              mini: true,
+              child: const Icon(Icons.refresh, color: Colors.white),
+            ),
+          ),
         ],
       ),
     );
+  }
+  
+  String _getViewTitle() {
+    switch (_currentView) {
+      case 'emails':
+        return 'Email Management';
+      case 'add_company':
+        return 'Add Company';
+      case 'companies':
+        return 'Manage Companies';
+      case 'rounds':
+        return 'Manage Rounds';
+      default:
+        return 'Dashboard';
+    }
+  }
+  
+  String _getViewSubtitle() {
+    switch (_currentView) {
+      case 'emails':
+        return 'View placement emails and communications';
+      case 'add_company':
+        return 'Register new companies for placements';
+      case 'companies':
+        return 'Manage company registrations and settings';
+      case 'rounds':
+        return 'Manage interview rounds and results';
+      default:
+        return 'Placement Coordination Center';
+    }
   }
 }

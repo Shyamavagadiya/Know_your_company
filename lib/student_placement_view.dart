@@ -36,6 +36,29 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   bool _isLoadingRounds = false;
   bool _isCompletingRound = false;
   
+  // Add this helper method to get the name of the first failed round
+  Future<String?> _getFailedRoundName(String companyId) async {
+    if (currentUserId == null || !_companyRounds.containsKey(companyId)) {
+      return null;
+    }
+    
+    final rounds = _companyRounds[companyId]!;
+    final passStatus = _roundPassStatus[companyId] ?? {};
+    final completionStatus = _roundCompletionStatus[companyId] ?? {};
+    
+    // Find the first round that is completed but not passed
+    for (var round in rounds) {
+      final isCompleted = completionStatus[round.id] ?? false;
+      final isPassed = passStatus[round.id] ?? false;
+      
+      if (isCompleted && !isPassed) {
+        return round.name;
+      }
+    }
+    
+    return null;
+  }
+  
   // Track student selections in a separate collection
   Future<void> _updateSelectionStatus(String companyId, String roundId, bool isSelected) async {
     try {
@@ -799,119 +822,263 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   }
   
   // Build the company registration section
-  // Build the company registration section
-Widget _buildCompanyRegistrationSection() {
-  if (_isLoadingCompanies) {
-    return const Center(child: CircularProgressIndicator());
-  }
-  
-  if (_availableCompanies.isEmpty) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          const Text(
-            'No companies available for registration',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Check back later for new opportunities',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _loadAvailableCompanies,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00A6BE),
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  return ListView.builder(
-    itemCount: _availableCompanies.length,
-    padding: const EdgeInsets.all(16),
-    itemBuilder: (context, index) {
-      final company = _availableCompanies[index];
-      final bool isRegistered = company['isRegistered'] ?? false;
-      final String? registrationId = company['registrationId'];
-      
-      return Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+  Widget _buildCompanyRegistrationSection() {
+    if (_isLoadingCompanies) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_availableCompanies.isEmpty) {
+      return Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ListTile(
-              title: Text(
-                company['name'],
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+            const Icon(Icons.business_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'No companies available for registration',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Status text
-                  Text(
-                    isRegistered 
-                        ? 'Status: Registered' 
-                        : 'Status: Open for Registration',
-                    style: TextStyle(
-                      color: isRegistered ? Colors.green : Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  
-                  // Register button (only show if not registered)
-                  if (!isRegistered) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isRegistering 
-                            ? null 
-                            : () => _registerForCompany(company['id']),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00A6BE),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: _isRegistering
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Register'),
-                      ),
-                    ),
-                  ],
-                ],
+            const SizedBox(height: 8),
+            const Text(
+              'Check back later for new opportunities',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadAvailableCompanies,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00A6BE),
+                foregroundColor: Colors.white,
               ),
             ),
           ],
         ),
       );
-    },
-  );
-}
+    }
+    
+    return ListView.builder(
+      itemCount: _availableCompanies.length,
+      padding: const EdgeInsets.all(16),
+      itemBuilder: (context, index) {
+        final company = _availableCompanies[index];
+        final bool isRegistered = company['isRegistered'] ?? false;
+        final String? registrationId = company['registrationId'];
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(
+                  company['name'],
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Status text
+                    Text(
+                      isRegistered 
+                          ? 'Status: Registered' 
+                          : 'Status: Open for Registration',
+                      style: TextStyle(
+                        color: isRegistered ? Colors.green : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    
+                    // Register button (only show if not registered)
+                    if (!isRegistered) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isRegistering 
+                              ? null 
+                              : () => _registerForCompany(company['id']),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00A6BE),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: _isRegistering
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Register'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Modified _buildFinalResultView method with specific failed round name
+  Widget _buildFinalResultView(String companyId, String companyName, bool anyRoundsFailed, bool isPlaced) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Final result card
+          FutureBuilder<String?>(
+            future: anyRoundsFailed ? _getFailedRoundName(companyId) : Future.value(null),
+            builder: (context, failedRoundSnapshot) {
+              final failedRoundName = failedRoundSnapshot.data;
+              
+              return Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isPlaced 
+                      ? Colors.green.shade50 
+                      : Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isPlaced 
+                        ? Colors.green.shade200 
+                        : Colors.red.shade200,
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Status icon
+                    Icon(
+                      isPlaced ? Icons.celebration : Icons.cancel_outlined,
+                      size: 48,
+                      color: isPlaced ? Colors.green : Colors.red,
+                    ),
+                    SizedBox(height: 12),
+                    
+                    // Status text
+                    Text(
+                      isPlaced ? 'PLACED!' : 'NOT SELECTED',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isPlaced ? Colors.green.shade800 : Colors.red.shade800,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    
+                    // Description with specific round name if failed
+                    Text(
+                      isPlaced 
+                          ? 'Congratulations! You have been successfully placed in $companyName.'
+                          : failedRoundName != null
+                              ? 'Unfortunately, you were not selected during the $failedRoundName.'
+                              : 'Unfortunately, you were not selected during the placement process.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isPlaced ? Colors.green.shade700 : Colors.red.shade700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          
+          SizedBox(height: 16),
+          
+          // Show details button (optional - to view full round details)
+          if (_showDebugInfo)
+            ElevatedButton.icon(
+              onPressed: () => _showDetailedRoundsDialog(companyId, companyName),
+              icon: Icon(Icons.visibility),
+              label: Text('View Details'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey,
+                foregroundColor: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Show detailed rounds in a dialog (optional)
+  void _showDetailedRoundsDialog(String companyId, String companyName) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('$companyName - Detailed Results'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _companyRounds[companyId]?.length ?? 0,
+              itemBuilder: (context, index) {
+                final round = _companyRounds[companyId]![index];
+                final isCompleted = _roundCompletionStatus[companyId]?[round.id] ?? false;
+                final isPassed = _roundPassStatus[companyId]?[round.id] ?? false;
+                
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: isCompleted 
+                        ? (isPassed ? Colors.green.shade100 : Colors.red.shade100)
+                        : Colors.grey.shade200,
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        color: isCompleted 
+                            ? (isPassed ? Colors.green.shade800 : Colors.red.shade800)
+                            : Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(round.name),
+                  trailing: isCompleted
+                      ? Icon(
+                          isPassed ? Icons.check_circle : Icons.cancel,
+                          color: isPassed ? Colors.green : Colors.red,
+                        )
+                      : Icon(Icons.pending, color: Colors.grey),
+                  subtitle: Text(
+                    isCompleted
+                        ? (isPassed ? 'Passed' : 'Failed')
+                        : 'Not attempted',
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1070,17 +1237,25 @@ Widget _buildCompanyRegistrationSection() {
                                   ],
                                 ),
                               )
-                            // Show rounds
+                            // Show rounds or final result
                             else
                               FutureBuilder<List<bool>>(
                                 future: Future.wait([
                                   _hasPassedAllRounds(companyId),
                                   _hasFailedAnyRound(companyId),
+                                  _isPlaced(companyId),
                                 ]),
                                 builder: (context, snapshot) {
                                   final allRoundsPassed = snapshot.data?[0] ?? false;
                                   final anyRoundsFailed = snapshot.data?[1] ?? false;
+                                  final isPlaced = snapshot.data?[2] ?? false;
                                   
+                                  // Show simplified result if student has failed any round OR is placed
+                                  if (anyRoundsFailed || isPlaced) {
+                                    return _buildFinalResultView(companyId, companyName, anyRoundsFailed, isPlaced);
+                                  }
+                                  
+                                  // Show detailed rounds view for ongoing process
                                   return Column(
                                     children: [
                                       // Display regular rounds
@@ -1182,63 +1357,47 @@ Widget _buildCompanyRegistrationSection() {
                                       
                                       // Display the "Placed" round if all other rounds are passed and no rounds are failed
                                       if (allRoundsPassed && !anyRoundsFailed)
-                                        FutureBuilder<bool>(
-                                          future: _isPlaced(companyId),
-                                          builder: (context, isPlacedSnapshot) {
-                                            final isPlaced = isPlacedSnapshot.data ?? false;
-                                            
-                                            return Column(
-                                              children: [
-                                                ListTile(
-                                                  leading: CircleAvatar(
-                                                    backgroundColor: isPlaced ? Colors.green.shade100 : Colors.grey.shade200,
-                                                    child: Icon(
-                                                      Icons.check_circle,
-                                                      color: isPlaced ? Colors.green : Colors.grey,
-                                                    ),
-                                                  ),
-                                                  title: Text(
-                                                    'Placed',
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      color: isPlaced ? Colors.green.shade800 : null,
-                                                    ),
-                                                  ),
-                                                  subtitle: Text(
-                                                    isPlaced
-                                                        ? 'Congratulations! You have been placed in this company.'
-                                                        : 'Final step - Mark yourself as placed in this company',
-                                                  ),
-                                                  trailing: isPlaced
-                                                      ? Chip(
-                                                          label: Text('PLACED'),
-                                                          backgroundColor: Colors.green.shade100,
-                                                          labelStyle: TextStyle(color: Colors.green.shade800),
-                                                        )
-                                                      : ElevatedButton(
-                                                          onPressed: !_isCompletingRound
-                                                              ? () => _markAsPlaced(companyId)
-                                                              : null,
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor: Colors.green,
-                                                            foregroundColor: Colors.white,
-                                                          ),
-                                                          child: _isCompletingRound
-                                                              ? SizedBox(
-                                                                  height: 20,
-                                                                  width: 20,
-                                                                  child: CircularProgressIndicator(
-                                                                    strokeWidth: 2,
-                                                                    color: Colors.white,
-                                                                  ),
-                                                                )
-                                                              : Text('Mark as Placed'),
-                                                        ),
+                                        Column(
+                                          children: [
+                                            ListTile(
+                                              leading: CircleAvatar(
+                                                backgroundColor: Colors.grey.shade200,
+                                                child: Icon(
+                                                  Icons.check_circle,
+                                                  color: Colors.grey,
                                                 ),
-                                                Divider(color: Colors.grey[300]),
-                                              ],
-                                            );
-                                          },
+                                              ),
+                                              title: Text(
+                                                'Placed',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              subtitle: Text(
+                                                'Final step - Mark yourself as placed in this company',
+                                              ),
+                                              trailing: ElevatedButton(
+                                                onPressed: !_isCompletingRound
+                                                    ? () => _markAsPlaced(companyId)
+                                                    : null,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                child: _isCompletingRound
+                                                    ? SizedBox(
+                                                        height: 20,
+                                                        width: 20,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white,
+                                                        ),
+                                                      )
+                                                    : Text('Mark as Placed'),
+                                              ),
+                                            ),
+                                            Divider(color: Colors.grey[300]),
+                                          ],
                                         ),
                                     ],
                                   );
@@ -1259,6 +1418,7 @@ Widget _buildCompanyRegistrationSection() {
         ],
       ),
     );
+    
   }
 
   // Helper method to build selection buttons
