@@ -676,6 +676,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
           .collection('companies')
           .get();
       
+      final now = DateTime.now();
       List<Map<String, dynamic>> companies = [];
       for (var doc in snapshot.docs) {
         // Only include companies that are open for registration
@@ -684,6 +685,15 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
             ? doc['isRegistrationOpen'] ?? true
             : true; // Default to true if field doesn't exist
         if (!isRegistrationOpen) continue;
+
+        // Also auto-enforce deadline on student side (even if toggle wasn't closed yet).
+        final Timestamp? deadlineTs = doc.data().containsKey('registrationDeadline')
+            ? doc['registrationDeadline'] as Timestamp?
+            : null;
+        final DateTime? deadline = deadlineTs?.toDate();
+        if (deadline != null && !deadline.isAfter(now)) {
+          continue; // registration expired
+        }
         
         // Check if the user has already registered for this company
         final registrationDoc = await FirebaseFirestore.instance
@@ -751,6 +761,30 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
     });
     
     try {
+      // Prevent duplicate registrations
+      final existing = await FirebaseFirestore.instance
+          .collection('company_registrations')
+          .where('companyId', isEqualTo: companyId)
+          .where('studentId', isEqualTo: currentUserId)
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        _showSuccessMessage('You are already registered for this company');
+        return;
+      }
+
+      // Enforce deadline check before allowing registration
+      final companyDoc = await FirebaseFirestore.instance.collection('companies').doc(companyId).get();
+      if (companyDoc.exists) {
+        final data = companyDoc.data() as Map<String, dynamic>;
+        final Timestamp? deadlineTs = data['registrationDeadline'] as Timestamp?;
+        final DateTime? deadline = deadlineTs?.toDate();
+        if (deadline != null && !deadline.isAfter(DateTime.now())) {
+          _showErrorMessage('Registration deadline has passed for this company');
+          return;
+        }
+      }
+
       // Add registration to the company_registrations collection
       await FirebaseFirestore.instance.collection('company_registrations').add({
         'companyId': companyId,
@@ -770,6 +804,37 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         _isRegistering = false;
       });
     }
+  }
+
+  Future<void> _confirmAndRegister(String companyId, String companyName) async {
+    if (_isRegistering) return;
+    final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm Registration'),
+            content: Text(
+              'Do you want to register for "$companyName"?\n\nOnce registered, you cannot cancel the registration.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('No'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00A6BE),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Yes, Register'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirm) return;
+    await _registerForCompany(companyId);
   }
   
   // Cancel registration for a company
@@ -842,7 +907,6 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
       itemBuilder: (context, index) {
         final company = _availableCompanies[index];
         final bool isRegistered = company['isRegistered'] ?? false;
-        final String? registrationId = company['registrationId'];
         
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
@@ -875,29 +939,18 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
                     ),
                     if (isRegistered)
                       ElevatedButton(
-                        onPressed: _isRegistering 
-                            ? null 
-                            : () => _cancelRegistration(registrationId!),
+                        onPressed: null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: Colors.grey,
                           foregroundColor: Colors.white,
                         ),
-                        child: _isRegistering
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Cancel Registration'),
+                        child: const Text('Registered'),
                       )
                     else
                       ElevatedButton(
                         onPressed: _isRegistering 
                             ? null 
-                            : () => _registerForCompany(company['id']),
+                            : () => _confirmAndRegister(company['id'], company['name']),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00A6BE),
                           foregroundColor: Colors.white,

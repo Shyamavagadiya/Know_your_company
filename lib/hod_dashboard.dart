@@ -6,6 +6,7 @@ import 'package:hcd_project2/module.dart';
 import 'package:hcd_project2/placement_history_page.dart';
 import 'package:hcd_project2/student_scores_view.dart';
 import 'package:hcd_project2/job_listings_view.dart';
+import 'package:hcd_project2/students_details_page.dart';
 
 class HodDashboard extends StatelessWidget {
   final String userName;
@@ -239,6 +240,20 @@ class HodDashboard extends StatelessWidget {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => const JobListingsView(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildCardButton(
+                              context,
+                              'Students Details',
+                              Icons.people,
+                              Colors.indigo,
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const StudentsDetailsPage(),
                                   ),
                                 );
                               },

@@ -20,6 +20,17 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  // Student-specific controllers
+  final _rollNumberController = TextEditingController();
+  final _semController = TextEditingController();
+  final _cgpaController = TextEditingController();
+  final _backlogsController = TextEditingController();
+  final _skillsController = TextEditingController();
+  final _resumeUrlController = TextEditingController();
+  final _percentage10thController = TextEditingController();
+  final _percentage12thController = TextEditingController();
+  String _selectedDomain = 'software';
+  bool _allowBacklogs = false;
   final AuthService _authService = AuthService();
   final GmailService _gmailService = GmailService();
   late String _selectedRole;
@@ -50,6 +61,14 @@ class _SignupScreenState extends State<SignupScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _rollNumberController.dispose();
+    _semController.dispose();
+    _cgpaController.dispose();
+    _backlogsController.dispose();
+    _skillsController.dispose();
+    _resumeUrlController.dispose();
+    _percentage10thController.dispose();
+    _percentage12thController.dispose();
     super.dispose();
   }
 
@@ -59,11 +78,44 @@ class _SignupScreenState extends State<SignupScreen> {
         _isLoading = true;
       });
       try {
+        // Build optional student profile data when role is student
+        Map<String, dynamic>? studentProfileData;
+        if (_selectedRole == 'student') {
+          final cgpa = double.tryParse(_cgpaController.text.trim());
+          final sem = int.tryParse(_semController.text.trim());
+          final backlogs = int.tryParse(_backlogsController.text.trim());
+          final percentage10th = double.tryParse(_percentage10thController.text.trim());
+          final percentage12th = double.tryParse(_percentage12thController.text.trim());
+          final skills = _skillsController.text
+              .split(',')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+
+          studentProfileData = {
+            'rollNumber': _rollNumberController.text.trim(),
+            if (sem != null) 'sem': sem,
+            if (cgpa != null) 'cgpa': cgpa,
+            if (percentage10th != null) 'percentage10th': percentage10th,
+            if (percentage12th != null) 'percentage12th': percentage12th,
+            'resume': _resumeUrlController.text.trim(),
+            'skillset': skills,
+            'domain': _selectedDomain,
+            'placementStatus': 'not_placed',
+            'eligibilityCriteria': {
+              'cgpaCutoff': 0.0,
+              'allowBacklogs': _allowBacklogs,
+              'backlogs': backlogs ?? 0,
+            },
+          };
+        }
+
         await _authService.signUp(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           role: _selectedRole,
+          studentProfileData: studentProfileData,
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account created successfully!')),
@@ -198,6 +250,205 @@ class _SignupScreenState extends State<SignupScreen> {
                             },
                           ),
                           const SizedBox(height: 15),
+                          // Extra fields only for student signup
+                          if (_selectedRole == 'student') ...[
+                            TextFormField(
+                              controller: _rollNumberController,
+                              decoration: const InputDecoration(
+                                labelText: 'Enrollment / Roll Number',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.confirmation_number,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your enrollment number';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            TextFormField(
+                              controller: _semController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Current Semester',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.school,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your current semester';
+                                }
+                                if (int.tryParse(value) == null) {
+                                  return 'Semester must be a number';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            TextFormField(
+                              controller: _cgpaController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Current CGPA',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.bar_chart,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your CGPA';
+                                }
+                                if (double.tryParse(value) == null) {
+                                  return 'CGPA must be a number';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _percentage10thController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: '10th Percentage',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.percent,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Required';
+                                      }
+                                      if (double.tryParse(value) == null) {
+                                        return 'Must be a number';
+                                      }
+                                      final percentage = double.tryParse(value);
+                                      if (percentage != null && (percentage < 0 || percentage > 100)) {
+                                        return 'Must be 0-100';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _percentage12thController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: '12th Percentage',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.percent,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Required';
+                                      }
+                                      if (double.tryParse(value) == null) {
+                                        return 'Must be a number';
+                                      }
+                                      final percentage = double.tryParse(value);
+                                      if (percentage != null && (percentage < 0 || percentage > 100)) {
+                                        return 'Must be 0-100';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _backlogsController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Number of Backlogs',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.error_outline,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: CheckboxListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: const Text('Backlogs Allowed'),
+                                    value: _allowBacklogs,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _allowBacklogs = val ?? false;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            DropdownButtonFormField<String>(
+                              decoration: const InputDecoration(
+                                labelText: 'Preferred Domain',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.category,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                              value: _selectedDomain,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'software',
+                                  child: Text('Software'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'vlsi',
+                                  child: Text('VLSI'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'ai_ml',
+                                  child: Text('AI / ML'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedDomain = value ?? 'software';
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                            TextFormField(
+                              controller: _skillsController,
+                              decoration: const InputDecoration(
+                                labelText: 'Skillset (comma separated)',
+                                hintText: 'e.g. Java, Flutter, SQL',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.star,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            TextFormField(
+                              controller: _resumeUrlController,
+                              decoration: const InputDecoration(
+                                labelText: 'Resume URL (optional)',
+                                hintText: 'Paste resume link or upload later',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.upload_file,
+                                    color: Color.fromARGB(255, 0, 166, 190)),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                          ],
                           TextFormField(
                             controller: _passwordController,
                             decoration: const InputDecoration(

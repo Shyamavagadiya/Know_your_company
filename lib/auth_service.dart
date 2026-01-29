@@ -34,11 +34,13 @@ class AuthService {
   }
 
   // Sign up with email and password
+  // Optional studentProfileData is used only when role == 'student'
   Future<UserCredential> signUp({
     required String email,
     required String password,
     required String name,
     required String role,
+    Map<String, dynamic>? studentProfileData,
   }) async {
     try {
       // Create user with email and password
@@ -47,7 +49,7 @@ class AuthService {
         password: password,
       );
 
-      // Add user to Firestore
+      // Add user to Firestore (users collection)
       await _firestore.collection('users').doc(result.user!.uid).set({
         'uid': result.user!.uid,
         'email': email,
@@ -59,22 +61,33 @@ class AuthService {
         'lastActive': FieldValue.serverTimestamp(),
       });
 
-      // If role is student, create student document
+      // If role is student, create student document in students collection
       if (role == 'student') {
-        await _firestore.collection('students').doc(result.user!.uid).set({
+        final defaultStudentData = {
           'uid': result.user!.uid,
           'rollNumber': '',
           'sem': 1,
           'cgpa': 0.0,
+          'percentage10th': 0.0,
+          'percentage12th': 0.0,
           'resume': '',
           'skillset': [],
           'placementStatus': 'not_placed',
+          'domain': '',
           'eligibilityCriteria': {
             'cgpaCutoff': 0.0,
             'allowBacklogs': false,
             'backlogs': 0,
           },
-        });
+        };
+
+        // Merge any provided studentProfileData over defaults
+        final dataToSave = {
+          ...defaultStudentData,
+          if (studentProfileData != null) ...studentProfileData,
+        };
+
+        await _firestore.collection('students').doc(result.user!.uid).set(dataToSave);
       }
 
       return result;

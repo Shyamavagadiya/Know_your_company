@@ -9,6 +9,8 @@ import 'package:hcd_project2/services/round_service.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:hcd_project2/coordinator_placement_announcement_page.dart';
+import 'package:hcd_project2/students_details_page.dart';
 
 // Page to display registered students for a company
 class RegisteredStudentsPage extends StatelessWidget {
@@ -271,8 +273,8 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   @override
   void initState() {
     super.initState();
-    // Initialize tab controller with 4 tabs
-    _tabController = TabController(length: 4, vsync: this);
+    // Initialize tab controller with 3 tabs (Emails, Companies, Rounds)
+    _tabController = TabController(length: 3, vsync: this);
     
     _initializeNotifications();
     _loadEmails();
@@ -375,8 +377,29 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
           .collection('companies')
           .orderBy('createdAt', descending: true)
           .get();
-      
-      final List<Map<String, dynamic>> companies = snapshot.docs.map((doc) {
+
+      // Auto-close registrations if deadline has passed.
+      // This runs whenever coordinator loads companies, so coordinator does not need
+      // to manually press "Close" on deadline day.
+      final now = DateTime.now();
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final bool isOpen = (data['isRegistrationOpen'] ?? true) == true;
+        final Timestamp? deadlineTs = data['registrationDeadline'] as Timestamp?;
+        final DateTime? deadline = deadlineTs?.toDate();
+
+        if (isOpen && deadline != null && !deadline.isAfter(now)) {
+          await doc.reference.update({'isRegistrationOpen': false});
+        }
+      }
+
+      // Re-read after updates so UI reflects latest values.
+      final QuerySnapshot refreshed = await FirebaseFirestore.instance
+          .collection('companies')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final List<Map<String, dynamic>> companies = refreshed.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
@@ -445,7 +468,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       }
       
       // Switch to companies tab
-      _tabController.animateTo(2);
+      _tabController.animateTo(1);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -511,7 +534,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       
       // Delete all student round progress for this company
       final progressSnapshot = await FirebaseFirestore.instance
-          .collection('studentRoundProgress')
+          .collection('student_round_progress')
           .where('companyId', isEqualTo: companyId)
           .get();
       
@@ -663,7 +686,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       });
       
       // Switch to the Rounds tab
-      _tabController.animateTo(3);
+      _tabController.animateTo(2);
     } catch (e) {
       setState(() {
         _isLoadingRounds = false;
@@ -1036,6 +1059,20 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                                 onPressed: () => _viewRegisteredStudents(company['id'], company['name']),
                               ),
                               _buildActionButton(
+                                icon: Icons.info_outline,
+                                label: 'About',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CoordinatorPlacementAnnouncementPage(
+                                        companyId: company['id'],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildActionButton(
                                 icon: Icons.format_list_numbered,
                                 label: 'Rounds',
                                 onPressed: () => _manageRounds(company['id'], company['name']),
@@ -1107,7 +1144,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                _tabController.animateTo(2); // Switch to Companies tab
+                _tabController.animateTo(1); // Switch to Companies tab
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00A6BE),
@@ -1208,7 +1245,6 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
           indicatorColor: Colors.white,
           tabs: const [
             Tab(icon: Icon(Icons.email), text: 'Emails'),
-            Tab(icon: Icon(Icons.add_business), text: 'Add Company'),
             Tab(icon: Icon(Icons.business), text: 'Companies'),
             Tab(icon: Icon(Icons.format_list_numbered), text: 'Rounds'),
           ],
@@ -1266,27 +1302,45 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               },
             ),
             ListTile(
-              leading: const Icon(Icons.add_business),
-              title: const Text('Add Company'),
+              leading: const Icon(Icons.business),
+              title: const Text('Companies'),
               onTap: () {
-                _tabController.animateTo(1); // Go to add company tab
+                _tabController.animateTo(1); // Go to companies tab
                 Navigator.pop(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.business),
-              title: const Text('Companies'),
+              leading: const Icon(Icons.campaign),
+              title: const Text('Add New Company'),
               onTap: () {
-                _tabController.animateTo(2); // Go to companies tab
                 Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CoordinatorPlacementAnnouncementPage(),
+                  ),
+                );
               },
             ),
             ListTile(
               leading: const Icon(Icons.format_list_numbered),
               title: const Text('Rounds'),
               onTap: () {
-                _tabController.animateTo(3); // Go to rounds tab
+                _tabController.animateTo(2); // Go to rounds tab
                 Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text('Students Details'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentsDetailsPage(),
+                  ),
+                );
               },
             ),
             const Divider(),
@@ -1323,11 +1377,9 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
         children: [
           // Tab 1: Email Management Page
           _buildEmailManagementPage(),
-          // Tab 2: Add Company Page
-          _buildAddCompanyPage(),
-          // Tab 3: Companies List Page
+          // Tab 2: Companies List Page
           _buildCompaniesListPage(),
-          // Tab 4: Rounds Management Page
+          // Tab 3: Rounds Management Page
           _buildRoundsPage(),
         ],
       ),

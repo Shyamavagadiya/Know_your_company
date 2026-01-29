@@ -10,6 +10,8 @@ import 'package:hcd_project2/gmail_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/firebase_email_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hcd_project2/student_placement_announcements_page.dart';
+import 'package:hcd_project2/student_profile_page.dart';
 
 // Use the class from GmailService.dart instead of redefining it
 // import 'package:hcd_project2/gmail_service.dart';
@@ -319,6 +321,19 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 onTap: _isConnectingGmail ? null : _connectGmailAccount,
               ),
             ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentProfilePage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.refresh),
               title: const Text('Refresh Emails'),
               onTap: _isLoading ? null : _loadEmails,
@@ -491,6 +506,21 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   },
                                   _isLoading,
                                   _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
+                                ),
+                                _buildCardButton(
+                                  context,
+                                  'Companies',
+                                  Icons.apartment,
+                                  Colors.indigo,
+                                  () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const StudentPlacementAnnouncementsPage(),
+                                      ),
+                                    );
+                                  },
                                 ),
                                 _buildCardButton(
                                   context,
