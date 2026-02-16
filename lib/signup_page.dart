@@ -178,426 +178,526 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  // Sign Up Text outside the container
-                  Text(
-                    'Sign Up',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 0, 166, 190),
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWeb = constraints.maxWidth > 600;
+        final double maxWidth = isWeb ? 550.0 : double.infinity;
+        final double horizontalPadding = isWeb ? 24.0 : 16.0;
+        final double verticalPadding = isWeb ? 16.0 : 16.0;
+        final double fieldSpacing = isWeb ? 12.0 : 15.0;
+        final double buttonPadding = isWeb ? 12.0 : 14.0;
+        final double containerPadding = isWeb ? 20.0 : 16.0;
+        
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: Stack(
+            children: [
+              Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: verticalPadding,
                   ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: const Offset(0, 3),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: Column(
+                      children: [
+                        // Sign Up Text outside the container
+                        Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            fontSize: isWeb ? 24 : 28,
+                            fontWeight: FontWeight.bold,
+                            color: const Color.fromARGB(255, 0, 166, 190),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TextFormField(
-                            controller: _nameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Full Name',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.person, color: Color.fromARGB(255, 0, 166, 190)),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              return null;
-                            },
+                        SizedBox(height: isWeb ? 16 : 20),
+                        Container(
+                          padding: EdgeInsets.all(containerPadding),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                spreadRadius: 2,
+                                blurRadius: 5,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 15),
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.email, color: Color.fromARGB(255, 0, 166, 190)),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!RegExp(r"^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$")
-                                  .hasMatch(value)) {
-                                return 'Please enter a valid email address';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 15),
-                          // Extra fields only for student signup
-                          if (_selectedRole == 'student') ...[
-                            TextFormField(
-                              controller: _rollNumberController,
-                              decoration: const InputDecoration(
-                                labelText: 'Enrollment / Roll Number',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.confirmation_number,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your enrollment number';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 15),
-                            TextFormField(
-                              controller: _semController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Current Semester',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.school,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your current semester';
-                                }
-                                if (int.tryParse(value) == null) {
-                                  return 'Semester must be a number';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 15),
-                            TextFormField(
-                              controller: _cgpaController,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(decimal: true),
-                              decoration: const InputDecoration(
-                                labelText: 'Current CGPA',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.bar_chart,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your CGPA';
-                                }
-                                if (double.tryParse(value) == null) {
-                                  return 'CGPA must be a number';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 15),
-                            Row(
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _percentage10thController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: const InputDecoration(
-                                      labelText: '10th Percentage',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.percent,
+                                TextFormField(
+                                  controller: _nameController,
+                                  style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                  decoration: InputDecoration(
+                                    labelText: 'Full Name',
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: isWeb ? 12 : 16,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.person, color: Color.fromARGB(255, 0, 166, 190)),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter your name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: fieldSpacing),
+                                TextFormField(
+                                  controller: _emailController,
+                                  style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                  decoration: InputDecoration(
+                                    labelText: 'Email',
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: isWeb ? 12 : 16,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.email, color: Color.fromARGB(255, 0, 166, 190)),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter your email';
+                                    }
+                                    if (!RegExp(r"^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$")
+                                        .hasMatch(value)) {
+                                      return 'Please enter a valid email address';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: fieldSpacing),
+                                // Extra fields only for student signup
+                                if (_selectedRole == 'student') ...[
+                                  TextFormField(
+                                    controller: _rollNumberController,
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    decoration: InputDecoration(
+                                      labelText: 'Enrollment / Roll Number',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.confirmation_number,
                                           color: Color.fromARGB(255, 0, 166, 190)),
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return 'Required';
-                                      }
-                                      if (double.tryParse(value) == null) {
-                                        return 'Must be a number';
-                                      }
-                                      final percentage = double.tryParse(value);
-                                      if (percentage != null && (percentage < 0 || percentage > 100)) {
-                                        return 'Must be 0-100';
+                                        return 'Please enter your enrollment number';
                                       }
                                       return null;
                                     },
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _percentage12thController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: const InputDecoration(
-                                      labelText: '12th Percentage',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.percent,
-                                          color: Color.fromARGB(255, 0, 166, 190)),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Required';
-                                      }
-                                      if (double.tryParse(value) == null) {
-                                        return 'Must be a number';
-                                      }
-                                      final percentage = double.tryParse(value);
-                                      if (percentage != null && (percentage < 0 || percentage > 100)) {
-                                        return 'Must be 0-100';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 15),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _backlogsController,
+                                  SizedBox(height: fieldSpacing),
+                                  TextFormField(
+                                    controller: _semController,
                                     keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Number of Backlogs',
-                                      border: OutlineInputBorder(),
-                                      prefixIcon: Icon(Icons.error_outline,
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    decoration: InputDecoration(
+                                      labelText: 'Current Semester',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.school,
                                           color: Color.fromARGB(255, 0, 166, 190)),
                                     ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter your current semester';
+                                      }
+                                      if (int.tryParse(value) == null) {
+                                        return 'Semester must be a number';
+                                      }
+                                      return null;
+                                    },
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: CheckboxListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: const Text('Backlogs Allowed'),
-                                    value: _allowBacklogs,
-                                    onChanged: (val) {
+                                  SizedBox(height: fieldSpacing),
+                                  TextFormField(
+                                    controller: _cgpaController,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(decimal: true),
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    decoration: InputDecoration(
+                                      labelText: 'Current CGPA',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.bar_chart,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter your CGPA';
+                                      }
+                                      if (double.tryParse(value) == null) {
+                                        return 'CGPA must be a number';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  SizedBox(height: fieldSpacing),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _percentage10thController,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(decimal: true),
+                                          style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                          decoration: InputDecoration(
+                                            labelText: '10th Percentage',
+                                            contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: isWeb ? 12 : 16,
+                                            ),
+                                            border: const OutlineInputBorder(),
+                                            prefixIcon: const Icon(Icons.percent,
+                                                color: Color.fromARGB(255, 0, 166, 190)),
+                                          ),
+                                          validator: (value) {
+                                            if (value == null || value.isEmpty) {
+                                              return 'Required';
+                                            }
+                                            if (double.tryParse(value) == null) {
+                                              return 'Must be a number';
+                                            }
+                                            final percentage = double.tryParse(value);
+                                            if (percentage != null && (percentage < 0 || percentage > 100)) {
+                                              return 'Must be 0-100';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                      SizedBox(width: isWeb ? 8 : 10),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _percentage12thController,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(decimal: true),
+                                          style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                          decoration: InputDecoration(
+                                            labelText: '12th Percentage',
+                                            contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: isWeb ? 12 : 16,
+                                            ),
+                                            border: const OutlineInputBorder(),
+                                            prefixIcon: const Icon(Icons.percent,
+                                                color: Color.fromARGB(255, 0, 166, 190)),
+                                          ),
+                                          validator: (value) {
+                                            if (value == null || value.isEmpty) {
+                                              return 'Required';
+                                            }
+                                            if (double.tryParse(value) == null) {
+                                              return 'Must be a number';
+                                            }
+                                            final percentage = double.tryParse(value);
+                                            if (percentage != null && (percentage < 0 || percentage > 100)) {
+                                              return 'Must be 0-100';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: fieldSpacing),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _backlogsController,
+                                          keyboardType: TextInputType.number,
+                                          style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                          decoration: InputDecoration(
+                                            labelText: 'Number of Backlogs',
+                                            contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: isWeb ? 12 : 16,
+                                            ),
+                                            border: const OutlineInputBorder(),
+                                            prefixIcon: const Icon(Icons.error_outline,
+                                                color: Color.fromARGB(255, 0, 166, 190)),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: isWeb ? 8 : 10),
+                                      Expanded(
+                                        child: CheckboxListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          title: Text(
+                                            'Backlogs Allowed',
+                                            style: TextStyle(fontSize: isWeb ? 13 : 14),
+                                          ),
+                                          value: _allowBacklogs,
+                                          onChanged: (val) {
+                                            setState(() {
+                                              _allowBacklogs = val ?? false;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: fieldSpacing),
+                                  DropdownButtonFormField<String>(
+                                    decoration: InputDecoration(
+                                      labelText: 'Preferred Domain',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.category,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    value: _selectedDomain,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'software',
+                                        child: Text('Software'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'vlsi',
+                                        child: Text('VLSI'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'ai_ml',
+                                        child: Text('AI / ML'),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
                                       setState(() {
-                                        _allowBacklogs = val ?? false;
+                                        _selectedDomain = value ?? 'software';
                                       });
                                     },
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 15),
-                            DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                labelText: 'Preferred Domain',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.category,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                              value: _selectedDomain,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'software',
-                                  child: Text('Software'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'vlsi',
-                                  child: Text('VLSI'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'ai_ml',
-                                  child: Text('AI / ML'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedDomain = value ?? 'software';
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 15),
-                            TextFormField(
-                              controller: _skillsController,
-                              decoration: const InputDecoration(
-                                labelText: 'Skillset (comma separated)',
-                                hintText: 'e.g. Java, Flutter, SQL',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.star,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-                            TextFormField(
-                              controller: _resumeUrlController,
-                              decoration: const InputDecoration(
-                                labelText: 'Resume URL (optional)',
-                                hintText: 'Paste resume link or upload later',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.upload_file,
-                                    color: Color.fromARGB(255, 0, 166, 190)),
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-                          ],
-                          TextFormField(
-                            controller: _passwordController,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock, color: Color.fromARGB(255, 0, 166, 190)),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
-                            obscureText: true,
-                          ),
-                          const SizedBox(height: 15),
-                          TextFormField(
-                            controller: _confirmPasswordController,
-                            decoration: const InputDecoration(
-                              labelText: 'Confirm Password',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.lock_outline, color: Color.fromARGB(255, 0, 166, 190)),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please confirm your password';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                            obscureText: true,
-                          ),
-                          const SizedBox(height: 15),
-                          DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Role',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.badge, color: Color.fromARGB(255, 0, 166, 190)),
-                            ),
-                            value: _selectedRole,
-                            items: _roles.map((role) {
-                              return DropdownMenuItem(
-                                value: role,
-                                child: Text(role),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedRole = value!;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 30),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color.fromARGB(255, 0, 166, 190),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: _isLoading ? null : _signup,
-                              child: _isLoading
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text(
-                                      'Sign Up',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                  SizedBox(height: fieldSpacing),
+                                  TextFormField(
+                                    controller: _skillsController,
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    decoration: InputDecoration(
+                                      labelText: 'Skillset (comma separated)',
+                                      hintText: 'e.g. Java, Flutter, SQL',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.star,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
                                     ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Google Sign-Up Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  SizedBox(height: fieldSpacing),
+                                  TextFormField(
+                                    controller: _resumeUrlController,
+                                    style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                    decoration: InputDecoration(
+                                      labelText: 'Resume URL (optional)',
+                                      hintText: 'Paste resume link or upload later',
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: isWeb ? 12 : 16,
+                                      ),
+                                      border: const OutlineInputBorder(),
+                                      prefixIcon: const Icon(Icons.upload_file,
+                                          color: Color.fromARGB(255, 0, 166, 190)),
+                                    ),
+                                  ),
+                                  SizedBox(height: fieldSpacing),
+                                ],
+                                TextFormField(
+                                  controller: _passwordController,
+                                  style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: isWeb ? 12 : 16,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255, 0, 166, 190)),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter a password';
+                                    }
+                                    if (value.length < 6) {
+                                      return 'Password must be at least 6 characters';
+                                    }
+                                    return null;
+                                  },
+                                  obscureText: true,
                                 ),
-                              ),
-                              onPressed: _isGoogleLoading ? null : _handleGoogleSignUp,
-                              child: _isGoogleLoading
-                                  ? const CircularProgressIndicator()
-                                  : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Image.asset(
-                                          'assets/images/google_logo.png',
-                                          height: 24,
-                                          width: 24,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        const Text(
-                                          'Sign up with Google',
-                                          style: TextStyle(
-                                            color: Colors.black54,
-                                            fontWeight: FontWeight.bold,
+                                SizedBox(height: fieldSpacing),
+                                TextFormField(
+                                  controller: _confirmPasswordController,
+                                  style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                  decoration: InputDecoration(
+                                    labelText: 'Confirm Password',
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: isWeb ? 12 : 16,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.lock_outline, color: Color.fromARGB(255, 0, 166, 190)),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please confirm your password';
+                                    }
+                                    if (value != _passwordController.text) {
+                                      return 'Passwords do not match';
+                                    }
+                                    return null;
+                                  },
+                                  obscureText: true,
+                                ),
+                                SizedBox(height: fieldSpacing),
+                                DropdownButtonFormField<String>(
+                                  decoration: InputDecoration(
+                                    labelText: 'Role',
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: isWeb ? 12 : 16,
+                                    ),
+                                    border: const OutlineInputBorder(),
+                                    prefixIcon: const Icon(Icons.badge, color: Color.fromARGB(255, 0, 166, 190)),
+                                  ),
+                                  style: TextStyle(fontSize: isWeb ? 14 : 16),
+                                  value: _selectedRole,
+                                  items: _roles.map((role) {
+                                    return DropdownMenuItem(
+                                      value: role,
+                                      child: Text(role),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedRole = value!;
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: isWeb ? 24 : 30),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color.fromARGB(255, 0, 166, 190),
+                                      padding: EdgeInsets.symmetric(vertical: buttonPadding),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    onPressed: _isLoading ? null : _signup,
+                                    child: _isLoading
+                                        ? const CircularProgressIndicator(color: Colors.white)
+                                        : Text(
+                                            'Sign Up',
+                                            style: TextStyle(
+                                              fontSize: isWeb ? 14 : 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                  ),
+                                ),
+                                SizedBox(height: isWeb ? 12 : 16),
+                                // Google Sign-Up Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(vertical: buttonPadding),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        side: BorderSide(color: Colors.grey.shade300),
+                                      ),
                                     ),
+                                    onPressed: _isGoogleLoading ? null : _handleGoogleSignUp,
+                                    child: _isGoogleLoading
+                                        ? const CircularProgressIndicator()
+                                        : Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Image.asset(
+                                                'assets/images/google_logo.png',
+                                                height: 24,
+                                                width: 24,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                'Sign up with Google',
+                                                style: TextStyle(
+                                                  fontSize: isWeb ? 14 : 16,
+                                                  color: Colors.black54,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        SizedBox(height: isWeb ? 16 : 20),
+                        // Login Text
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            );
+                          },
+                          child: Text(
+                            "Already have an account? Login",
+                            style: TextStyle(
+                              fontSize: isWeb ? 14 : 16,
+                              color: const Color.fromARGB(255, 0, 166, 190),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  // Login Text
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      );
-                    },
-                    child: const Text(
-                      "Already have an account? Login",
-                      style: TextStyle(color: Color.fromARGB(255, 0, 166, 190), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Positioned(
+                bottom: 20,
+                right: 20,
+                child: FloatingActionButton(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const LandingPage()),
+                    );
+                  },
+                  backgroundColor: const Color.fromARGB(255, 0, 166, 190),
+                  child: const Icon(Icons.home, color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LandingPage()),
-                );
-              },
-              backgroundColor: const Color.fromARGB(255, 0, 166, 190),
-              child: const Icon(Icons.home, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
