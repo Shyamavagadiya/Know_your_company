@@ -7,10 +7,14 @@ import 'package:hcd_project2/models/round_model.dart';
 import 'package:hcd_project2/notification_service.dart';
 import 'package:hcd_project2/services/round_service.dart';
 import 'package:hcd_project2/user_provider.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:hcd_project2/coordinator_placement_announcement_page.dart';
 import 'package:hcd_project2/students_details_page.dart';
+import 'package:hcd_project2/placement_history_page.dart';
+import 'package:hcd_project2/hod_round_results_page.dart';
+import 'package:hcd_project2/hod_company_registrations_page.dart';
 
 // Page to display registered students for a company
 class RegisteredStudentsPage extends StatelessWidget {
@@ -239,7 +243,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   final NotificationService _notificationService = NotificationService();
   final FirebaseEmailService _firebaseEmailService = FirebaseEmailService();
   final GmailService _gmailService = GmailService();
-  final RoundService _roundService = RoundService();
+  RoundService _roundService = RoundService();
   
   // Tab controller
   late TabController _tabController;
@@ -256,6 +260,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   List<Map<String, dynamic>> _companies = [];
   bool _isLoadingCompanies = false;
   bool _isAddingCompany = false;
+  int? _activeBatchYear;
   
   // Student management
   List<Map<String, dynamic>> _registeredStudents = [];
@@ -273,12 +278,22 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   @override
   void initState() {
     super.initState();
-    // Initialize tab controller with 3 tabs (Emails, Companies, Rounds)
-    _tabController = TabController(length: 3, vsync: this);
+    // Initialize tab controller with 4 tabs (Dashboard, Emails, Companies, Rounds)
+    _tabController = TabController(length: 4, vsync: this);
     
     _initializeNotifications();
     _loadEmails();
-    _loadCompanies();
+    _initActiveBatchAndLoad();
+  }
+
+  Future<void> _initActiveBatchAndLoad() async {
+    final year = await ActiveBatch.resolve(context);
+    if (!mounted) return;
+    setState(() {
+      _activeBatchYear = year;
+      _roundService = RoundService(batchYear: year);
+    });
+    await _loadCompanies();
   }
   
   @override
@@ -373,10 +388,12 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     });
     
     try {
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('companies')
-          .orderBy('createdAt', descending: true)
-          .get();
+      Query base = FirebaseFirestore.instance.collection('companies');
+      if (_activeBatchYear != null) {
+        base = base.where('batchYear', isEqualTo: _activeBatchYear);
+      }
+
+      final QuerySnapshot snapshot = await base.get();
 
       // Auto-close registrations if deadline has passed.
       // This runs whenever coordinator loads companies, so coordinator does not need
@@ -394,10 +411,7 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       }
 
       // Re-read after updates so UI reflects latest values.
-      final QuerySnapshot refreshed = await FirebaseFirestore.instance
-          .collection('companies')
-          .orderBy('createdAt', descending: true)
-          .get();
+      final QuerySnapshot refreshed = await base.get();
 
       final List<Map<String, dynamic>> companies = refreshed.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -408,6 +422,16 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
           'isRegistrationOpen': data['isRegistrationOpen'] ?? true,
         };
       }).toList();
+
+      // Sort in-memory to avoid composite index requirements.
+      companies.sort((a, b) {
+        final aTs = a['createdAt'] as Timestamp?;
+        final bTs = b['createdAt'] as Timestamp?;
+        if (aTs == null && bTs == null) return 0;
+        if (aTs == null) return 1;
+        if (bTs == null) return -1;
+        return bTs.compareTo(aTs);
+      });
       
       setState(() {
         _companies = companies;
@@ -438,6 +462,20 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       );
       return;
     }
+
+    final activeYear = _activeBatchYear ?? await ActiveBatch.resolve(context);
+    if (activeYear == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Active batch is not configured yet (config/app.activeBatchYear).'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    _activeBatchYear = activeYear;
     
     setState(() {
       _isAddingCompany = true;
@@ -445,10 +483,11 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     
     try {
       // Add company to Firestore
-      final companyRef = await FirebaseFirestore.instance.collection('companies').add({
+      await FirebaseFirestore.instance.collection('companies').add({
         'name': _companyNameController.text.trim(),
         'createdAt': Timestamp.now(),
         'isRegistrationOpen': true,
+        'batchYear': activeYear,
       });
       
       // Clear the text field
@@ -607,10 +646,13 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     
     try {
       // Get registered students from Firestore
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+      Query regQ = FirebaseFirestore.instance
           .collection('company_registrations')
-          .where('companyId', isEqualTo: companyId)
-          .get();
+          .where('companyId', isEqualTo: companyId);
+      if (_activeBatchYear != null) {
+        regQ = regQ.where('batchYear', isEqualTo: _activeBatchYear);
+      }
+      final QuerySnapshot snapshot = await regQ.get();
       
       final List<Map<String, dynamic>> students = [];
       
@@ -804,11 +846,14 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
   Future<List<Map<String, dynamic>>> _loadRoundResults(String companyId, String roundId) async {
     try {
       // Get all student progress documents for this round
-      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+      Query q = FirebaseFirestore.instance
           .collection('student_round_progress')
           .where('companyId', isEqualTo: companyId)
-          .where('roundId', isEqualTo: roundId)
-          .get();
+          .where('roundId', isEqualTo: roundId);
+      if (_activeBatchYear != null) {
+        q = q.where('batchYear', isEqualTo: _activeBatchYear);
+      }
+      final QuerySnapshot snapshot = await q.get();
       
       final List<Map<String, dynamic>> results = [];
       
@@ -866,6 +911,143 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
     }
   }
   
+  // Dashboard with cards (similar to HOD)
+  Widget _buildDashboardPage() {
+    final width = MediaQuery.of(context).size.width;
+    final isWeb = width > 600;
+    final crossAxisCount = width > 1200 ? 4 : (width > 900 ? 3 : (width > 600 ? 3 : 2));
+    final aspectRatio = isWeb ? 1.35 : 1.0;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxW = isWeb ? 1200.0 : constraints.maxWidth;
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxW),
+              child: GridView.count(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                shrinkWrap: true,
+                childAspectRatio: aspectRatio,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildDashboardCard(
+                    'Placed Students',
+                    Icons.history,
+                    Colors.green,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PlacementHistoryPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDashboardCard(
+                    'Add New Company',
+                    Icons.add_business,
+                    const Color(0xFF00A6BE),
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CoordinatorPlacementAnnouncementPage(),
+                        ),
+                      ).then((_) => _loadCompanies());
+                    },
+                  ),
+                  _buildDashboardCard(
+                    'Company Placement track',
+                    Icons.assessment,
+                    Colors.purple,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HodRoundResultsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDashboardCard(
+                    'Edit Company Details',
+                    Icons.business,
+                    Colors.indigo,
+                    () {
+                      _tabController.animateTo(1); // Companies tab
+                    },
+                  ),
+                  _buildDashboardCard(
+                    'Students Details',
+                    Icons.people,
+                    Colors.blue,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const StudentsDetailsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDashboardCard(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 32, color: color),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Tab Pages
   Widget _buildEmailManagementPage() {
     return Column(
@@ -1054,9 +1236,19 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               _buildActionButton(
-                                icon: Icons.people,
-                                label: 'Students',
-                                onPressed: () => _viewRegisteredStudents(company['id'], company['name']),
+                                icon: Icons.how_to_reg,
+                                label: 'Registrations',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HodCompanyRegistrationsPage(
+                                        companyId: company['id'],
+                                        companyName: company['name'],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                               _buildActionButton(
                                 icon: Icons.info_outline,
@@ -1244,9 +1436,10 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
           controller: _tabController,
           indicatorColor: Colors.white,
           tabs: const [
-            Tab(icon: Icon(Icons.email), text: 'Emails'),
+            Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
             Tab(icon: Icon(Icons.business), text: 'Companies'),
             Tab(icon: Icon(Icons.format_list_numbered), text: 'Rounds'),
+            Tab(icon: Icon(Icons.email), text: 'Emails'),
           ],
         ),
       ),
@@ -1294,23 +1487,43 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.email),
-              title: const Text('Email Management'),
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Dashboard'),
               onTap: () {
-                _tabController.animateTo(0); // Go to emails tab
+                _tabController.animateTo(0);
                 Navigator.pop(context);
               },
             ),
+            const Divider(),
             ListTile(
-              leading: const Icon(Icons.business),
-              title: const Text('Companies'),
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.history, size: 22, color: Colors.green),
+              ),
+              title: const Text('Placed Students'),
               onTap: () {
-                _tabController.animateTo(1); // Go to companies tab
                 Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PlacementHistoryPage(),
+                  ),
+                );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.campaign),
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00A6BE).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.add_business, size: 22, color: Color(0xFF00A6BE)),
+              ),
               title: const Text('Add New Company'),
               onTap: () {
                 Navigator.pop(context);
@@ -1319,19 +1532,83 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                   MaterialPageRoute(
                     builder: (context) => const CoordinatorPlacementAnnouncementPage(),
                   ),
+                ).then((_) => _loadCompanies());
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.assessment, size: 22, color: Colors.purple),
+              ),
+              title: const Text('Company Placement track'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HodRoundResultsPage(),
+                  ),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.format_list_numbered),
-              title: const Text('Rounds'),
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.email, size: 22, color: Colors.orange),
+              ),
+              title: const Text('Email Management'),
               onTap: () {
-                _tabController.animateTo(2); // Go to rounds tab
+                _tabController.animateTo(3);
                 Navigator.pop(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.people),
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.business, size: 22, color: Colors.indigo),
+              ),
+              title: const Text('Edit Company Details'),
+              onTap: () {
+                _tabController.animateTo(1);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.format_list_numbered, size: 22, color: Colors.teal),
+              ),
+              title: const Text('Rounds'),
+              onTap: () {
+                _tabController.animateTo(2);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.people, size: 22, color: Colors.blue),
+              ),
               title: const Text('Students Details'),
               onTap: () {
                 Navigator.pop(context);
@@ -1375,12 +1652,10 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Email Management Page
-          _buildEmailManagementPage(),
-          // Tab 2: Companies List Page
+          _buildDashboardPage(),
           _buildCompaniesListPage(),
-          // Tab 3: Rounds Management Page
           _buildRoundsPage(),
+          _buildEmailManagementPage(),
         ],
       ),
     );

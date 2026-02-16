@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 
 class PlacementHistoryPage extends StatefulWidget {
   const PlacementHistoryPage({Key? key}) : super(key: key);
@@ -11,6 +12,7 @@ class PlacementHistoryPage extends StatefulWidget {
 
 class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  int? _activeBatchYear;
   
   // For storing and filtering placed students
   List<Map<String, dynamic>> _allPlacedStudents = [];
@@ -42,13 +44,21 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
     });
 
     try {
+      _activeBatchYear ??= await ActiveBatch.resolve(context);
+
       // Get all placement records with 'placed' status
       final QuerySnapshot placementSnapshot = await _firestore
           .collection('placement_history')
           .where('status', isEqualTo: 'placed')
           .get();
 
-      if (placementSnapshot.docs.isEmpty) {
+      final placedDocs = placementSnapshot.docs.where((d) {
+        if (_activeBatchYear == null) return true;
+        final data = d.data() as Map<String, dynamic>;
+        return data['batchYear'] == _activeBatchYear;
+      }).toList();
+
+      if (placedDocs.isEmpty) {
         setState(() {
           _allPlacedStudents = [];
           _filteredPlacedStudents = [];
@@ -63,7 +73,7 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
       // Get student details for each placed student
       List<Map<String, dynamic>> placedStudentsList = [];
       
-      for (var doc in placementSnapshot.docs) {
+      for (var doc in placedDocs) {
         final data = doc.data() as Map<String, dynamic>;
         final studentId = data['studentId'];
         final companyId = data['companyId'];
@@ -79,18 +89,35 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
           }
         }
 
-        // Get student details from users collection
+        // Get student details from users and students collections
         final userDoc = await _firestore.collection('users').doc(studentId).get();
+        final studentDoc = await _firestore.collection('students').doc(studentId).get();
+
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
+          final studentData = studentDoc.data() as Map<String, dynamic>? ?? {};
+          
+          final jobTitle = (data['jobProfileTitle'] ?? '').toString();
+          final minLpa = data['jobProfileMinPackageLpa'];
+          final maxLpa = data['jobProfileMaxPackageLpa'];
+
+          // Prefer rollNumber from students collection as enrollment number
+          final enrollmentNumber = (studentData['rollNumber'] ??
+                  userData['enrollmentNumber'] ??
+                  userData['enrollment'] ??
+                  'No enrollment')
+              .toString();
+
           placedStudentsList.add({
             'id': studentId,
             'name': userData['displayName'] ?? userData['name'] ?? 'Unknown Student',
-            'email': userData['email'] ?? 'No email',
-            'enrollmentNumber': userData['enrollmentNumber'] ?? userData['enrollment'] ?? 'No enrollment',
             'companyId': companyId,
             'companyName': companyNames[companyId]!,
             'placedAt': data['placedAt'] ?? Timestamp.now(),
+            'jobProfileTitle': jobTitle,
+            'jobProfileMinPackageLpa': minLpa,
+            'jobProfileMaxPackageLpa': maxLpa,
+            'enrollmentNumber': enrollmentNumber,
           });
         }
       }
@@ -154,9 +181,23 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
               Text('Company: ${student['companyName']}', 
                 style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 0, 166, 190))),
               SizedBox(height: 8),
-              Text('Email: ${student['email']}'),
-              SizedBox(height: 4),
               Text('Enrollment: ${student['enrollmentNumber']}'),
+              SizedBox(height: 4),
+              if ((student['jobProfileTitle'] ?? '').toString().isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 4),
+                    Text('Position: ${student['jobProfileTitle']}'),
+                  ],
+                ),
+              SizedBox(height: 4),
+              if (student['jobProfileMinPackageLpa'] != null ||
+                  student['jobProfileMaxPackageLpa'] != null)
+                Text(
+                  'Package: ${_formatPackage(student['jobProfileMinPackageLpa'], student['jobProfileMaxPackageLpa'])}',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
               SizedBox(height: 4),
               Text(
                 'Placed on: ${DateFormat('MMM d, yyyy').format(student['placedAt'].toDate())}',
@@ -178,6 +219,21 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
         );
       },
     );
+  }
+
+  String _formatPackage(dynamic minLpa, dynamic maxLpa) {
+    double? min = (minLpa is num) ? minLpa.toDouble() : double.tryParse('$minLpa');
+    double? max = (maxLpa is num) ? maxLpa.toDouble() : double.tryParse('$maxLpa');
+
+    String format(double v) =>
+        v.toStringAsFixed(v % 1 == 0 ? 0 : 1);
+
+    if (min == null && max == null) return '-';
+    if (min != null && max != null) {
+      return '${format(min)} - ${format(max)} LPA';
+    }
+    if (min != null) return '${format(min)} LPA';
+    return '${format(max!)} LPA';
   }
 
   // Show success message
@@ -352,15 +408,43 @@ class _PlacementHistoryPageState extends State<PlacementHistoryPage> {
                                             backgroundColor: Colors.green,
                                             child: Icon(Icons.check, color: Colors.white),
                                           ),
-                                          title: Text(student['name']),
+                                          title: Text(
+                                            student['name'],
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                           subtitle: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(student['email']),
-                                              Text('Enrollment: ${student['enrollmentNumber']}'),
+                                              if ((student['jobProfileTitle'] ?? '').toString().isNotEmpty)
+                                                Text(
+                                                  student['jobProfileTitle'],
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 15,
+                                                  ),
+                                                ),
+                                              if (student['jobProfileMinPackageLpa'] != null ||
+                                                  student['jobProfileMaxPackageLpa'] != null)
+                                                Text(
+                                                  _formatPackage(
+                                                    student['jobProfileMinPackageLpa'],
+                                                    student['jobProfileMaxPackageLpa'],
+                                                  ),
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade800,
+                                                    fontWeight: FontWeight.w500,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
                                               Text(
                                                 'Placed on: ${DateFormat('MMM d, yyyy').format(student['placedAt'].toDate())}',
-                                                style: TextStyle(fontStyle: FontStyle.italic),
+                                                style: TextStyle(
+                                                  fontStyle: FontStyle.italic,
+                                                  fontSize: 13,
+                                                ),
                                               ),
                                             ],
                                           ),

@@ -147,13 +147,6 @@ class FacultyDashboard extends StatelessWidget {
                           children: [
                             _buildCardButton(
                               context,
-                              'Add Company Details',
-                              Icons.business,
-                              Colors.blue,
-                              () {},
-                            ),
-                            _buildCardButton(
-                              context,
                               "Student's Placement History",
                               Icons.history,
                               Colors.green,
@@ -186,20 +179,6 @@ class FacultyDashboard extends StatelessWidget {
                               Icons.upload_file,
                               Colors.red,
                               () {},
-                            ),
-                            _buildCardButton(
-                              context,
-                              'Quizzes',
-                              Icons.fact_check,
-                              Colors.purple,
-                              () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => Module(),
-                                  ),
-                                );
-                              },
                             ),
                             _buildCardButton(
                               context,

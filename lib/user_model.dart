@@ -5,6 +5,8 @@ class UserModel {
   final String email;
   final String name;
   final String role;
+  final int? batchYear;
+  final String status; // active | alumni
   final String profilePicture;
   final String fcmToken;
   final DateTime createdAt;
@@ -18,6 +20,8 @@ class UserModel {
     required this.email,
     required this.name,
     required this.role,
+    required this.batchYear,
+    required this.status,
     required this.profilePicture,
     required this.fcmToken,
     required this.createdAt,
@@ -25,15 +29,30 @@ class UserModel {
   });
 
   factory UserModel.fromMap(Map<String, dynamic> data) {
+    final createdAtTs = data['createdAt'];
+    final lastActiveTs = data['lastActive'];
+
     return UserModel(
       uid: data['uid'] ?? '',
       email: data['email'] ?? '',
       name: data['name'] ?? '',
       role: data['role'] ?? '',
+      batchYear: (data['batchYear'] is int)
+          ? data['batchYear'] as int
+          : (data['batchYear'] is num)
+              ? (data['batchYear'] as num).toInt()
+              : (data['batchYear'] is String)
+                  ? int.tryParse(data['batchYear'] as String)
+                  : null,
+      status: (data['status'] ?? 'active').toString(),
       profilePicture: data['profilePicture'] ?? '',
       fcmToken: data['fcmToken'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      lastActive: (data['lastActive'] as Timestamp).toDate(),
+      createdAt: (createdAtTs is Timestamp)
+          ? createdAtTs.toDate()
+          : DateTime.now(),
+      lastActive: (lastActiveTs is Timestamp)
+          ? lastActiveTs.toDate()
+          : DateTime.now(),
     );
   }
 
@@ -43,6 +62,8 @@ class UserModel {
       'email': email,
       'name': name,
       'role': role,
+      'batchYear': batchYear,
+      'status': status,
       'profilePicture': profilePicture,
       'fcmToken': fcmToken,
       'createdAt': createdAt,

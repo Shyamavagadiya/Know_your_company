@@ -6,6 +6,7 @@ import 'package:hcd_project2/signup_page.dart';
 import 'package:hcd_project2/landing_page.dart';
 import 'package:hcd_project2/user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -267,6 +268,11 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (result != null) {
+          // activeYear can be null if batch is not configured yet.
+          // In that case, users/students will have batchYear = null
+          // and will not show up when a specific active batch is selected later.
+          final activeYear = await ActiveBatch.resolve(context);
+
           // Get the password to store securely
           String password = result['password'] ?? '';
 
@@ -276,6 +282,8 @@ class _LoginScreenState extends State<LoginScreen> {
             'email': googleUser.email,
             'name': result['name'] ?? googleUser.displayName ?? '',
             'role': result['role'] ?? 'student',
+            'batchYear': activeYear,
+            'status': (result['role'] == 'alumni') ? 'alumni' : 'active',
             'profilePicture': googleUser.photoUrl ?? '',
             'googleLinked': true,
             'authProvider': 'google',
@@ -295,6 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'resume': '',
               'skillset': [],
               'placementStatus': 'not_placed',
+              'batchYear': activeYear,
               'eligibilityCriteria': {
                 'cgpaCutoff': 0.0,
                 'allowBacklogs': false,

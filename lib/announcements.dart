@@ -9,24 +9,30 @@ class AnnouncementPage extends StatefulWidget {
 }
 
 class _AnnouncementPageState extends State<AnnouncementPage> {
-  final TextEditingController _announcementController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   final CollectionReference _annRef =
       FirebaseFirestore.instance.collection('announcement');
 
   void _addAnnouncement() async {
-    final text = _announcementController.text.trim();
-    if (text.isNotEmpty) {
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+    if (title.isNotEmpty || description.isNotEmpty) {
       await _annRef.add({
-        'message': text,
+        'title': title.isEmpty ? 'Announcement' : title,
+        'description': description,
+        'message': description.isNotEmpty ? description : title, // backward compat
         'timestamp': FieldValue.serverTimestamp(),
       });
-      _announcementController.clear();
+      _titleController.clear();
+      _descriptionController.clear();
     }
   }
 
   @override
   void dispose() {
-    _announcementController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -37,44 +43,77 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         title: const Text('Announcements'),
         backgroundColor: const Color.fromARGB(255, 0, 166, 190),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _announcementController,
-              decoration: InputDecoration(
-                hintText: 'Enter your announcement...',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _addAnnouncement,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() {});
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Title',
+                  hintText: 'Enter announcement title...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-              onSubmitted: (_) => _addAnnouncement(),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
+              const SizedBox(height: 12),
+              TextField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Enter announcement description...',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                maxLines: 4,
+                onSubmitted: (_) => _addAnnouncement(),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _addAnnouncement,
+                icon: const Icon(Icons.send),
+                label: const Text('Post Announcement'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 0, 166, 190),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 24),
+              StreamBuilder<QuerySnapshot>(
                 stream: _annRef.orderBy('timestamp', descending: true).snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
                   }
 
                   final data = snapshot.data;
 
                   if (data == null || data.docs.isEmpty) {
-                    return const Center(child: Text('No announcements yet.'));
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: Text('No announcements yet.')),
+                    );
                   }
 
-                  return ListView(
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: data.docs.map((doc) {
-                      final msg = doc['message'] ?? '';
+                      final d = doc.data() as Map<String, dynamic>? ?? {};
+                      final title = d['title']?.toString().trim() ?? '';
+                      final description = d['description']?.toString().trim() ?? d['message']?.toString().trim() ?? '';
                       final timestamp = (doc['timestamp'] as Timestamp?)?.toDate();
-                      final id = doc.id;
 
                       return Card(
                         elevation: 5,
@@ -82,23 +121,58 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          title: Text(
-                            msg,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          subtitle: timestamp != null
-                              ? Text(
-                                  'Posted on ${timestamp.day}/${timestamp.month}/${timestamp.year} at ${timestamp.hour}:${timestamp.minute}',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 12,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.announcement,
+                                    color: Color.fromARGB(255, 0, 166, 190),
+                                    size: 28,
                                   ),
-                                )
-                              : null,
-                          leading: const Icon(
-                            Icons.announcement,
-                            color: Color.fromARGB(255, 0, 166, 190),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title.isEmpty ? 'Announcement' : title,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (description.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            description,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[800],
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                        if (timestamp != null) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Posted on ${timestamp.day}/${timestamp.month}/${timestamp.year} at ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -106,8 +180,9 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   );
                 },
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

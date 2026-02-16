@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:hcd_project2/user_provider.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 
 /// Shared helpers
 Widget _commonLabel(String text) {
@@ -67,6 +70,7 @@ class _StudentPlacementAnnouncementsPageState
 
   @override
   Widget build(BuildContext context) {
+    final activeBatchYear = Provider.of<UserProvider>(context).activeBatchYear;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Companies'),
@@ -92,10 +96,14 @@ class _StudentPlacementAnnouncementsPageState
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('companies')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
+              stream: (() {
+                Query<Map<String, dynamic>> q =
+                    FirebaseFirestore.instance.collection('companies');
+                if (activeBatchYear != null) {
+                  q = q.where('batchYear', isEqualTo: activeBatchYear);
+                }
+                return q.snapshots();
+              })(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -107,7 +115,15 @@ class _StudentPlacementAnnouncementsPageState
                   );
                 }
 
-                final docs = snapshot.data!.docs;
+                final docs = snapshot.data!.docs.toList()
+                  ..sort((a, b) {
+                    final aTs = a.data()['createdAt'] as Timestamp?;
+                    final bTs = b.data()['createdAt'] as Timestamp?;
+                    if (aTs == null && bTs == null) return 0;
+                    if (aTs == null) return 1;
+                    if (bTs == null) return -1;
+                    return bTs.compareTo(aTs);
+                  });
 
                 final filteredDocs = docs.where((doc) {
                   if (_searchQuery.isEmpty) return true;
@@ -209,7 +225,11 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
     required this.companyId,
   }) : super(key: key);
 
-  Future<void> _registerForCompany(BuildContext context, String companyId) async {
+  Future<void> _registerForCompany(
+    BuildContext context,
+    String companyId,
+    Map<String, dynamic>? jobProfile,
+  ) async {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -255,11 +275,20 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
       return;
     }
 
+    final profile = jobProfile ?? const <String, dynamic>{};
+    final activeYear = await ActiveBatch.resolve(context);
+
     await FirebaseFirestore.instance.collection('company_registrations').add({
       'companyId': companyId,
       'studentId': currentUserId,
       'timestamp': FieldValue.serverTimestamp(),
       'status': 'pending',
+      'batchYear': activeYear,
+      if (profile.isNotEmpty) ...{
+        'jobProfileTitle': profile['title'] ?? '',
+        'jobProfileMinPackageLpa': profile['minPackageLpa'],
+        'jobProfileMaxPackageLpa': profile['maxPackageLpa'],
+      },
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -324,6 +353,73 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
           final List<dynamic> jobProfiles =
               (data['jobProfiles'] ?? []) as List<dynamic>;
 
+          Future<Map<String, dynamic>?> _selectJobProfile() async {
+            if (jobProfiles.isEmpty) return null;
+            if (jobProfiles.length == 1) {
+              return jobProfiles.first as Map<String, dynamic>;
+            }
+
+            int tempIndex = 0;
+
+            return showDialog<Map<String, dynamic>>(
+              context: context,
+              builder: (dialogContext) {
+                return StatefulBuilder(
+                  builder: (dialogContext, setState) {
+                    return AlertDialog(
+                      title: const Text('Select Job Profile'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: jobProfiles.length,
+                          itemBuilder: (context, index) {
+                            final map = jobProfiles[index]
+                                as Map<String, dynamic>;
+                            final title =
+                                (map['title'] ?? '').toString();
+                            final min = (map['minPackageLpa'] ?? 0)
+                                .toString();
+                            final max = (map['maxPackageLpa'] ?? 0)
+                                .toString();
+                            final range = _commonFormatLpaRange(min, max);
+                            return RadioListTile<int>(
+                              value: index,
+                              groupValue: tempIndex,
+                              onChanged: (val) {
+                                setState(() {
+                                  tempIndex = val ?? 0;
+                                });
+                              },
+                              title: Text(title),
+                              subtitle: Text(range),
+                            );
+                          },
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(null),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop(
+                              jobProfiles[tempIndex]
+                                  as Map<String, dynamic>,
+                            );
+                          },
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            );
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Card(
@@ -368,8 +464,14 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
                               .limit(1)
                               .snapshots(),
                       builder: (context, regSnap) {
-                        final isRegistered =
-                            (currentUserId != null) && (regSnap.data?.docs.isNotEmpty ?? false);
+                        final activeBatchYear =
+                            Provider.of<UserProvider>(context).activeBatchYear;
+                        final isRegistered = (currentUserId != null) &&
+                            (regSnap.data?.docs.any((d) {
+                                  if (activeBatchYear == null) return true;
+                                  return d.data()['batchYear'] == activeBatchYear;
+                                }) ??
+                                false);
 
                         return SizedBox(
                           width: double.infinity,
@@ -377,6 +479,10 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
                             onPressed: isRegistered
                                 ? null
                                 : () async {
+                                    final selectedProfile =
+                                        await _selectJobProfile();
+                                    if (selectedProfile == null) return;
+
                                     final confirm = await showDialog<bool>(
                                           context: context,
                                           builder: (context) => AlertDialog(
@@ -402,7 +508,11 @@ class StudentPlacementAnnouncementDetailPage extends StatelessWidget {
                                         ) ??
                                         false;
                                     if (!confirm) return;
-                                    await _registerForCompany(context, companyId);
+                                    await _registerForCompany(
+                                      context,
+                                      companyId,
+                                      selectedProfile,
+                                    );
                                   },
                             icon: const Icon(Icons.how_to_reg),
                             style: ElevatedButton.styleFrom(

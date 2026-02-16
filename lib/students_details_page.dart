@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 
 class StudentsDetailsPage extends StatefulWidget {
   const StudentsDetailsPage({super.key});
@@ -13,30 +15,79 @@ class _StudentsDetailsPageState extends State<StudentsDetailsPage> {
   List<Map<String, dynamic>> _allStudents = [];
   Map<String, List<Map<String, dynamic>>> _studentsByDomain = {};
   Map<String, Map<String, int>> _domainStats = {}; // {domain: {placed: X, total: Y}}
+  int? _activeBatchYear;
+
+  StreamSubscription<QuerySnapshot>? _placementHistorySubscription;
 
   @override
   void initState() {
     super.initState();
     _loadStudents();
+    // Listen to placement_history changes for real-time updates
+    _placementHistorySubscription = FirebaseFirestore.instance
+        .collection('placement_history')
+        .where('status', isEqualTo: 'placed')
+        .snapshots()
+        .listen((snapshot) {
+      // Reload students when placement status changes
+      _loadStudents();
+    });
   }
 
+  @override
+  void dispose() {
+    _placementHistorySubscription?.cancel();
+    super.dispose();
+  }
+
+  bool _loadInProgress = false;
+
   Future<void> _loadStudents() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (_loadInProgress) return;
+    _loadInProgress = true;
+    if (mounted) setState(() => _isLoading = true);
 
     try {
-      // Fetch all students
-      final studentsSnapshot = await FirebaseFirestore.instance
-          .collection('students')
-          .get();
+      _activeBatchYear ??= await ActiveBatch.resolve(context);
 
-      _allStudents = studentsSnapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
+      // Fetch all students. We'll handle batch logic in memory so that
+      // legacy students without batchYear are still visible.
+      final studentsSnapshot =
+          await FirebaseFirestore.instance.collection('students').get();
+
+      final List<Map<String, dynamic>> rawList =
+          studentsSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final int? docBatchYear = (data['batchYear'] is int)
+            ? data['batchYear'] as int
+            : (data['batchYear'] is num)
+                ? (data['batchYear'] as num).toInt()
+                : (data['batchYear'] is String)
+                    ? int.tryParse(data['batchYear'] as String)
+                    : null;
+
+        // If an active batch is set, only keep students for that batch,
+        // plus legacy students without batchYear.
+        if (_activeBatchYear != null &&
+            docBatchYear != null &&
+            docBatchYear != _activeBatchYear) {
+          return <String, dynamic>{};
+        }
+
+        return <String, dynamic>{
           'uid': doc.id,
           ...data,
         };
+      }).where((m) => m.isNotEmpty).toList();
+
+      // Deduplicate by uid so one entry per student (avoids duplicate on refresh)
+      final seenUids = <String>{};
+      _allStudents = rawList.where((s) {
+        final uid = s['uid'] as String?;
+        if (uid == null || uid.isEmpty) return false;
+        if (seenUids.contains(uid)) return false;
+        seenUids.add(uid);
+        return true;
       }).toList();
 
       // Fetch user names for students
@@ -92,9 +143,39 @@ class _StudentsDetailsPageState extends State<StudentsDetailsPage> {
         'ai_ml': {'placed': 0, 'total': 0},
       };
 
+      // Check placement_history to determine actual placement status
+      final placementHistorySnapshot = await FirebaseFirestore.instance
+          .collection('placement_history')
+          .where('status', isEqualTo: 'placed')
+          .get();
+      
+      // Create a set of placed student IDs
+      final placedStudentIds = placementHistorySnapshot.docs
+          .where((d) {
+            if (_activeBatchYear == null) return true;
+            final data = d.data() as Map<String, dynamic>;
+            final int? by = (data['batchYear'] is int)
+                ? data['batchYear'] as int
+                : (data['batchYear'] is num)
+                    ? (data['batchYear'] as num).toInt()
+                    : (data['batchYear'] is String)
+                        ? int.tryParse(data['batchYear'] as String)
+                        : null;
+            // Treat legacy placement records without batchYear as belonging
+            // to the currently active batch for compatibility.
+            if (by == null) return true;
+            return by == _activeBatchYear;
+          })
+          .map((doc) => doc.data()['studentId'] as String)
+          .toSet();
+
       for (var student in _allStudents) {
         final domain = student['domain'] as String? ?? 'software';
-        final placementStatus = student['placementStatus'] as String? ?? 'not_placed';
+        final studentId = student['uid'] as String;
+        
+        // Check placement status from placement_history (source of truth)
+        final isPlaced = placedStudentIds.contains(studentId);
+        student['placementStatus'] = isPlaced ? 'placed' : 'not_placed';
         
         // Normalize domain name
         String normalizedDomain = 'software';
@@ -109,7 +190,7 @@ class _StudentsDetailsPageState extends State<StudentsDetailsPage> {
           _domainStats[normalizedDomain]!['total'] = 
               (_domainStats[normalizedDomain]!['total'] ?? 0) + 1;
           
-          if (placementStatus == 'placed') {
+          if (isPlaced) {
             _domainStats[normalizedDomain]!['placed'] = 
                 (_domainStats[normalizedDomain]!['placed'] ?? 0) + 1;
           }
@@ -122,6 +203,7 @@ class _StudentsDetailsPageState extends State<StudentsDetailsPage> {
         );
       }
     } finally {
+      _loadInProgress = false;
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -565,10 +647,46 @@ class StudentDetailViewPage extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildDetailRow('Placement Status', placementStatus == 'placed' ? 'Placed' : 'Not Placed'),
+                    FutureBuilder<Map<String, String>?>(
+                      future: _loadPlacementInfo(context),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: LinearProgressIndicator(),
+                          );
+                        }
+                        final info = snapshot.data;
+                        if (info == null) {
+                          return _buildDetailRow(
+                            'Placement',
+                            placementStatus == 'placed'
+                                ? 'Placed'
+                                : 'Not placed yet',
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDetailRow(
+                                'Company', info['company'] ?? '-'),
+                            if ((info['position'] ?? '').isNotEmpty)
+                              _buildDetailRow(
+                                  'Position', info['position'] ?? ''),
+                            if ((info['package'] ?? '').isNotEmpty)
+                              _buildDetailRow(
+                                  'Package', info['package'] ?? ''),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     _buildDetailRow('Backlogs', backlogs.toString()),
-                    _buildDetailRow('Backlogs Allowed', allowBacklogs ? 'Yes' : 'No'),
+                    _buildDetailRow('Backlogs Allowed',
+                        allowBacklogs ? 'Yes' : 'No'),
                     if (resume.isNotEmpty)
                       _buildDetailRow('Resume', resume, isLink: true),
                   ],
@@ -658,5 +776,71 @@ class StudentDetailViewPage extends StatelessWidget {
       default:
         return domain;
     }
+  }
+
+  Future<Map<String, String>?> _loadPlacementInfo(BuildContext context) async {
+    final uid = (student['uid'] ?? student['id'] ?? '').toString();
+    if (uid.isEmpty) return null;
+
+    try {
+      final activeYear = await ActiveBatch.resolve(context);
+      final snap = await FirebaseFirestore.instance
+          .collection('placement_history')
+          .where('studentId', isEqualTo: uid)
+          .where('status', isEqualTo: 'placed')
+          .get();
+      final docs = snap.docs.where((d) {
+        if (activeYear == null) return true;
+        final data = d.data() as Map<String, dynamic>;
+        return data['batchYear'] == activeYear;
+      }).toList();
+      if (docs.isEmpty) return null;
+
+      final data = docs.first.data() as Map<String, dynamic>;
+      final companyId = (data['companyId'] ?? '').toString();
+
+      String companyName = 'Unknown';
+      if (companyId.isNotEmpty) {
+        final companyDoc = await FirebaseFirestore.instance
+            .collection('companies')
+            .doc(companyId)
+            .get();
+        if (companyDoc.exists && companyDoc.data() != null) {
+          companyName =
+              (companyDoc.data()!['name'] ?? 'Unknown').toString();
+        }
+      }
+
+      final position = (data['jobProfileTitle'] ?? '').toString();
+      final package = _formatPackage(
+        data['jobProfileMinPackageLpa'],
+        data['jobProfileMaxPackageLpa'],
+      );
+
+      return {
+        'company': companyName,
+        'position': position,
+        'package': package,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatPackage(dynamic minLpa, dynamic maxLpa) {
+    double? min =
+        (minLpa is num) ? minLpa.toDouble() : double.tryParse('$minLpa');
+    double? max =
+        (maxLpa is num) ? maxLpa.toDouble() : double.tryParse('$maxLpa');
+
+    String fmt(double v) =>
+        v.toStringAsFixed(v % 1 == 0 ? 0 : 1);
+
+    if (min == null && max == null) return '';
+    if (min != null && max != null) {
+      return '${fmt(min)} - ${fmt(max)} LPA';
+    }
+    if (min != null) return '${fmt(min)} LPA';
+    return '${fmt(max!)} LPA';
   }
 }

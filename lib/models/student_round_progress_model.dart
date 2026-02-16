@@ -10,6 +10,7 @@ class StudentRoundProgress {
   final String? resultNotes; // Optional notes about the result
   final DateTime? completedAt;
   final DateTime createdAt;
+  final int? batchYear;
 
   StudentRoundProgress({
     required this.id,
@@ -21,6 +22,7 @@ class StudentRoundProgress {
     this.resultNotes,
     this.completedAt,
     required this.createdAt,
+    this.batchYear,
   });
 
   factory StudentRoundProgress.fromFirestore(DocumentSnapshot doc) {
@@ -35,6 +37,13 @@ class StudentRoundProgress {
       resultNotes: data['resultNotes'],
       completedAt: data['completedAt'] != null ? (data['completedAt'] as Timestamp).toDate() : null,
       createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
+      batchYear: (data['batchYear'] is int)
+          ? data['batchYear'] as int
+          : (data['batchYear'] is num)
+              ? (data['batchYear'] as num).toInt()
+              : (data['batchYear'] is String)
+                  ? int.tryParse(data['batchYear'] as String)
+                  : null,
     );
   }
 
@@ -44,8 +53,11 @@ class StudentRoundProgress {
       'companyId': companyId,
       'roundId': roundId,
       'isCompleted': isCompleted,
+      'isPassed': isPassed,
+      'resultNotes': resultNotes,
       'completedAt': completedAt,
       'createdAt': createdAt,
+      'batchYear': batchYear,
     };
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 
 class CoordinatorPlacementAnnouncementPage extends StatefulWidget {
   final String? companyId; // null = create, non-null = edit existing
@@ -241,6 +242,11 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
 
     setState(() => _isSubmitting = true);
     try {
+      // activeYear can be null when batch is not configured yet.
+      // In that case, companies will simply have batchYear = null and
+      // will not appear once a specific active batch is chosen later.
+      final activeYear = await ActiveBatch.resolve(context);
+
       final companyName = _companyNameController.text.trim();
       final int? companySerialNumber =
           int.tryParse(_companyContactController.text.trim());
@@ -252,17 +258,23 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
       if (widget.companyId == null) {
         // Creating a new company declaration
         final existingCompanyQuery =
-            await companiesRef.where('name', isEqualTo: companyName).limit(1).get();
+            await companiesRef.where('name', isEqualTo: companyName).get();
 
-        final bool isCreatingCompany = existingCompanyQuery.docs.isEmpty;
+        final sameBatchDocs = existingCompanyQuery.docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return data['batchYear'] == activeYear;
+        }).toList();
+
+        final bool isCreatingCompany = sameBatchDocs.isEmpty;
         if (isCreatingCompany) {
           companyDocRef = await companiesRef.add({
             'name': companyName,
             'createdAt': FieldValue.serverTimestamp(),
             'isRegistrationOpen': true,
+            'batchYear': activeYear,
           });
         } else {
-          companyDocRef = existingCompanyQuery.docs.first.reference;
+          companyDocRef = sameBatchDocs.first.reference;
         }
       } else {
         // Editing an existing company by id
@@ -288,6 +300,7 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
         'campusSchedule': _campusScheduleController.text.trim(),
         'status': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
+        'batchYear': activeYear,
       }, SetOptions(merge: true));
 
       // 2) (Optional backwards compatibility) also write to `placement_announcements`
@@ -311,6 +324,7 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
         'campusSchedule': _campusScheduleController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'active',
+        'batchYear': activeYear,
       });
 
       if (!mounted) return;
@@ -396,37 +410,81 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-                  child: _isLoadingExisting
-                      ? const Center(child: CircularProgressIndicator())
-                      : Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionTitle('Company Details'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _companyNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Company Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Company Name is required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _companyContactController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Company Serial Number',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final isWeb = width > 600;
+            final maxFormWidth = isWeb ? 720.0 : width;
+            final padding = isWeb ? 24.0 : 16.0;
 
-                const SizedBox(height: 16),
-                _sectionTitle('Registration Deadline'),
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(padding),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxFormWidth),
+                  child: _isLoadingExisting
+                      ? const Padding(
+                          padding: EdgeInsets.all(48),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _sectionTitle('Company Details'),
+                              const SizedBox(height: 8),
+                              if (isWeb)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: TextFormField(
+                                          controller: _companyNameController,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Company Name',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Company Name is required' : null,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _companyContactController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Company Serial Number',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else ...[
+                                TextFormField(
+                                  controller: _companyNameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Company Name',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Company Name is required' : null,
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _companyContactController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Company Serial Number',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 16),
+                              _sectionTitle('Registration Deadline'),
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: _pickDeadline,
@@ -486,61 +544,127 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
                 const SizedBox(height: 16),
                 _sectionTitle('Eligibility Criteria'),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _cgpaCutoffController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'CGPA Cutoff (optional)',
-                    border: OutlineInputBorder(),
+                if (isWeb)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _cgpaCutoffController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'CGPA Cutoff (optional)',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _tenthPercentageController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: '10th % (optional)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _twelfthPercentageController,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: '12th % (optional)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _backlogsCountController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Max Backlogs (if allowed)',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Allow Backlogs'),
+                              value: _backlogsAllowed,
+                              onChanged: (v) => setState(() => _backlogsAllowed = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  TextField(
+                    controller: _cgpaCutoffController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'CGPA Cutoff (optional)',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _tenthPercentageController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: '10th Percentage (optional)',
-                          border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _tenthPercentageController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: '10th Percentage (optional)',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _twelfthPercentageController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: '12th Percentage (optional)',
-                          border: OutlineInputBorder(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _twelfthPercentageController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: '12th Percentage (optional)',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _backlogsCountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Max Backlogs (if allowed)',
+                      border: OutlineInputBorder(),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _backlogsCountController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Max Backlogs (if allowed)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Allow Backlogs'),
-                  value: _backlogsAllowed,
-                  onChanged: (v) => setState(() => _backlogsAllowed = v),
-                ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Allow Backlogs'),
+                    value: _backlogsAllowed,
+                    onChanged: (v) => setState(() => _backlogsAllowed = v),
+                  ),
+                ],
 
                 const SizedBox(height: 16),
                 _sectionTitle('Job Profiles'),
@@ -558,22 +682,52 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
                 const SizedBox(height: 16),
                 _sectionTitle('Other Details'),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _workLocationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Work Location',
-                    border: OutlineInputBorder(),
+                if (isWeb)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextField(
+                            controller: _workLocationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Work Location',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _campusScheduleController,
+                          decoration: const InputDecoration(
+                            labelText: 'Campus Date & Time',
+                            hintText: 'e.g. Will Be Declared Soon',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  TextField(
+                    controller: _workLocationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Work Location',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _campusScheduleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Campus Date & Time',
-                    hintText: 'e.g. Will Be Declared Soon',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _campusScheduleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Campus Date & Time',
+                      hintText: 'e.g. Will Be Declared Soon',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
+                ],
 
                 const SizedBox(height: 24),
                 SizedBox(
@@ -594,6 +748,10 @@ class _CoordinatorPlacementAnnouncementPageState extends State<CoordinatorPlacem
               ],
             ),
           ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

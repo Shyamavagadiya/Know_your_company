@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:hcd_project2/services/round_service.dart';
 import 'package:hcd_project2/models/round_model.dart';
 import 'package:hcd_project2/models/student_round_progress_model.dart';
+import 'package:hcd_project2/utils/active_batch.dart';
 
 class StudentPlacementHistoryPage extends StatefulWidget {
   const StudentPlacementHistoryPage({Key? key}) : super(key: key);
@@ -17,7 +18,8 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   final CollectionReference companiesCollection =
       FirebaseFirestore.instance.collection('placement_history');
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
-  final RoundService _roundService = RoundService();
+  RoundService _roundService = RoundService();
+  int? _activeBatchYear;
   bool _showDebugInfo = false; // Toggle for debug information
   
   // Tab controller for switching between placement history and company registration
@@ -468,6 +470,37 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
       _showErrorMessage('Failed to load rounds: ${e.toString()}');
     }
   }
+
+  // Preload rounds for all companies the current student has registered for
+  Future<void> _preloadAllCompanyRoundsForStudent() async {
+    if (currentUserId == null) return;
+
+    try {
+      _activeBatchYear ??= await ActiveBatch.resolve(context);
+      _roundService = RoundService(batchYear: _activeBatchYear);
+
+      Query q = FirebaseFirestore.instance
+          .collection('company_registrations')
+          .where('studentId', isEqualTo: currentUserId);
+      if (_activeBatchYear != null) {
+        q = q.where('batchYear', isEqualTo: _activeBatchYear);
+      }
+      final registrationsSnapshot = await q.get();
+
+      if (registrationsSnapshot.docs.isEmpty) return;
+
+      final companyIds = registrationsSnapshot.docs
+          .map((doc) => doc['companyId'] as String)
+          .toSet()
+          .toList();
+
+      // Load rounds for all registered companies in parallel
+      await Future.wait(companyIds.map((companyId) => _loadCompanyRounds(companyId)));
+    } catch (e) {
+      // Avoid spamming UI with errors on init; just log
+      print('Error preloading company rounds for student: $e');
+    }
+  }
   
   // Check if a student has passed all rounds for a company
   Future<bool> _hasPassedAllRounds(String companyId) async {
@@ -654,7 +687,18 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initActiveBatch();
     _loadAvailableCompanies();
+    _preloadAllCompanyRoundsForStudent();
+  }
+
+  Future<void> _initActiveBatch() async {
+    final year = await ActiveBatch.resolve(context);
+    if (!mounted) return;
+    setState(() {
+      _activeBatchYear = year;
+      _roundService = RoundService(batchYear: year);
+    });
   }
   
   @override
@@ -671,24 +715,30 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
     });
     
     try {
+      _activeBatchYear ??= await ActiveBatch.resolve(context);
+      _roundService = RoundService(batchYear: _activeBatchYear);
+
       // Get all companies first, then filter in the app to avoid needing a composite index
-      final snapshot = await FirebaseFirestore.instance
-          .collection('companies')
-          .get();
+      Query q = FirebaseFirestore.instance.collection('companies');
+      if (_activeBatchYear != null) {
+        q = q.where('batchYear', isEqualTo: _activeBatchYear);
+      }
+      final snapshot = await q.get();
       
       final now = DateTime.now();
       List<Map<String, dynamic>> companies = [];
       for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
         // Only include companies that are open for registration
         // Handle possible field name variations
-        final bool isRegistrationOpen = doc.data().containsKey('isRegistrationOpen') 
-            ? doc['isRegistrationOpen'] ?? true
+        final bool isRegistrationOpen = data.containsKey('isRegistrationOpen') 
+            ? (data['isRegistrationOpen'] ?? true)
             : true; // Default to true if field doesn't exist
         if (!isRegistrationOpen) continue;
 
         // Also auto-enforce deadline on student side (even if toggle wasn't closed yet).
-        final Timestamp? deadlineTs = doc.data().containsKey('registrationDeadline')
-            ? doc['registrationDeadline'] as Timestamp?
+        final Timestamp? deadlineTs = data.containsKey('registrationDeadline')
+            ? data['registrationDeadline'] as Timestamp?
             : null;
         final DateTime? deadline = deadlineTs?.toDate();
         if (deadline != null && !deadline.isAfter(now)) {
@@ -706,7 +756,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         
         companies.add({
           'id': doc.id,
-          'name': doc['name'],
+          'name': data['name'],
           'isRegistered': isRegistered,
           'registrationId': isRegistered ? registrationDoc.docs.first.id : null,
         });
@@ -718,8 +768,10 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
           var docA = snapshot.docs.firstWhere((doc) => doc.id == a['id']);
           var docB = snapshot.docs.firstWhere((doc) => doc.id == b['id']);
           
-          var timestampA = docA.data().containsKey('timestamp') ? docA['timestamp'] : null;
-          var timestampB = docB.data().containsKey('timestamp') ? docB['timestamp'] : null;
+          final dataA = docA.data() as Map<String, dynamic>;
+          final dataB = docB.data() as Map<String, dynamic>;
+          var timestampA = dataA.containsKey('timestamp') ? dataA['timestamp'] : null;
+          var timestampB = dataB.containsKey('timestamp') ? dataB['timestamp'] : null;
           
           if (timestampA == null && timestampB == null) return 0;
           if (timestampA == null) return 1;
@@ -761,6 +813,8 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
     });
     
     try {
+      _activeBatchYear ??= await ActiveBatch.resolve(context);
+
       // Prevent duplicate registrations
       final existing = await FirebaseFirestore.instance
           .collection('company_registrations')
@@ -791,6 +845,7 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         'studentId': currentUserId,
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'pending', // Could be 'pending', 'approved', 'rejected'
+        'batchYear': _activeBatchYear,
       });
       
       // Refresh the list of available companies
@@ -1011,10 +1066,15 @@ class _StudentPlacementHistoryPageState extends State<StudentPlacementHistoryPag
         children: [
           // Tab 1: Placement History
           FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('company_registrations')
-                .where('studentId', isEqualTo: currentUserId)
-                .get(),
+            future: (() {
+              Query q = FirebaseFirestore.instance
+                  .collection('company_registrations')
+                  .where('studentId', isEqualTo: currentUserId);
+              if (_activeBatchYear != null) {
+                q = q.where('batchYear', isEqualTo: _activeBatchYear);
+              }
+              return q.get();
+            })(),
             builder: (context, registrationsSnapshot) {
               if (registrationsSnapshot.hasError) {
                 return Center(child: Text('Error: ${registrationsSnapshot.error}'));

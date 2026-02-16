@@ -12,6 +12,7 @@ import 'package:hcd_project2/firebase_email_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hcd_project2/student_placement_announcements_page.dart';
 import 'package:hcd_project2/student_profile_page.dart';
+import 'package:hcd_project2/placement_history_page.dart';
 
 // Use the class from GmailService.dart instead of redefining it
 // import 'package:hcd_project2/gmail_service.dart';
@@ -388,40 +389,44 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ),
           ),
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 40),
-                      Row(
-  children: [
-    Flexible(
-      child: Text(
-        '${widget.userName}\'s Dashboard',
-        overflow: TextOverflow.ellipsis, // optional
-        style: TextStyle(fontSize: 25),
-      ),
-    ),
-  ],
-),
-
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Track Placement Progress',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 40),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '${widget.userName}\'s Dashboard',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Track Placement Progress',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: _showEmails 
+                  const SizedBox(height: 20),
+                  _showEmails
                     ? Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -458,158 +463,174 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Expanded(
-                              child: _isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : SingleChildScrollView(
-                                    child: _buildEmailList(),
-                                  ),
-                            ),
+                            _isLoading
+                              ? const Padding(
+                                  padding: EdgeInsets.all(48),
+                                  child: Center(child: CircularProgressIndicator()),
+                                )
+                              : _buildEmailList(),
                           ],
                         ),
                       )
-                    : Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(30),
-                            topRight: Radius.circular(30),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 10,
+                    : LayoutBuilder(
+                        builder: (context, outerConstraints) {
+                          final width = outerConstraints.maxWidth;
+                          final isWeb = width > 600;
+                          final maxContentWidth = isWeb ? 1200.0 : width;
+                          final padding = isWeb ? 20.0 : 24.0;
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: maxContentWidth),
+                              child: Container(
+                                padding: EdgeInsets.all(padding),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(30),
+                                    topRight: Radius.circular(30),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      spreadRadius: 1,
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final w = constraints.maxWidth;
+                                    int crossAxisCount = 2;
+                                    if (w > 1200) {
+                                      crossAxisCount = 4;
+                                    } else if (w > 900) {
+                                      crossAxisCount = 3;
+                                    } else if (w > 600) {
+                                      crossAxisCount = 3;
+                                    } else {
+                                      crossAxisCount = 2;
+                                    }
+                                    final aspectRatio = isWeb ? 1.35 : 1.0;
+                                    return GridView.count(
+                                      crossAxisCount: crossAxisCount,
+                                      mainAxisSpacing: 12,
+                                      crossAxisSpacing: 12,
+                                      shrinkWrap: true,
+                                      childAspectRatio: aspectRatio,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      children: [
+                                        _buildCardButton(
+                                          context,
+                                          'Company Details',
+                                          Icons.business,
+                                          Colors.blue,
+                                          () {
+                                            _toggleEmailView();
+                                          },
+                                          _isLoading,
+                                          _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          'Companies',
+                                          Icons.apartment,
+                                          Colors.indigo,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const StudentPlacementAnnouncementsPage(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          "Update Your Progress",
+                                          Icons.history,
+                                          Colors.green,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const StudentPlacementHistoryPage(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          'Placed Students',
+                                          Icons.history,
+                                          Colors.green,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const PlacementHistoryPage(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          'Announcements',
+                                          Icons.campaign,
+                                          Colors.blue,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const StudentAnnouncementView(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          'Ask Alumni',
+                                          Icons.school,
+                                          Colors.purple,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const StudentMentorshipView(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        _buildCardButton(
+                                          context,
+                                          'Alumni Careers',
+                                          Icons.work,
+                                          Colors.teal,
+                                          () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const JobListingsView(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            int crossAxisCount =
-                                constraints.maxWidth > 600 ? 3 : 2;
-                            return GridView.count(
-                              crossAxisCount: crossAxisCount,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              shrinkWrap: true,
-                              // Allow scrolling within the grid
-                              physics: const ScrollPhysics(),
-                              children: [
-                                _buildCardButton(
-                                  context,
-                                  'Company Details',
-                                  Icons.business,
-                                  Colors.blue,
-                                  () {
-                                    _toggleEmailView();
-                                  },
-                                  _isLoading,
-                                  _emails != null && _emails!.isNotEmpty ? _emails!.length.toString() : null,
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Companies',
-                                  Icons.apartment,
-                                  Colors.indigo,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentPlacementAnnouncementsPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  "Placement History",
-                                  Icons.history,
-                                  Colors.green,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentPlacementHistoryPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Announcements',
-                                  Icons.campaign,
-                                  Colors.blue,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentAnnouncementView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Ask Alumni',
-                                  Icons.school,
-                                  Colors.purple,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentMentorshipView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Quizzes',
-                                  Icons.quiz,
-                                  Colors.orange,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const StudentQuizView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Resume upload',
-                                  Icons.upload_file,
-                                  Colors.brown,
-                                  () {},
-                                ),
-                                _buildCardButton(
-                                  context,
-                                  'Alumni Careers',
-                                  Icons.work,
-                                  Colors.teal,
-                                  () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const JobListingsView(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                          );
+                        },
                       ),
-                ),
-              ],
+                  const SizedBox(height: 80),
+                ],
+              ),
             ),
           ),
           Positioned(

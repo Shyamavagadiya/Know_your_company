@@ -45,6 +45,11 @@ class _HomeScreenState extends State<HomeScreen> {
           return const LoginScreen();
         }
 
+        // If user is marked as alumni, always route to Alumni dashboard
+        if (userProvider.currentUser!.status.toLowerCase() == 'alumni') {
+          return const AlumniDashboard();
+        }
+
         // Route to the appropriate dashboard based on the user's role
         switch (userProvider.currentUser!.role) {
           case 'student':
