@@ -8,6 +8,7 @@ import 'package:hcd_project2/job_listings_view.dart';
 import 'package:hcd_project2/students_details_page.dart';
 import 'package:hcd_project2/hod_company_details_page.dart';
 import 'package:hcd_project2/hod_batch_settings_page.dart';
+import 'package:hcd_project2/student_track_page.dart';
 import 'package:hcd_project2/utils/active_batch.dart';
 
 class HodDashboard extends StatelessWidget {
@@ -321,6 +322,20 @@ class HodDashboard extends StatelessWidget {
                                   MaterialPageRoute(
                                     builder: (context) =>
                                         const HodBatchSettingsPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildCardButton(
+                              context,
+                              'Particular Student Track',
+                              Icons.person_search,
+                              Colors.deepOrange,
+                              () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const StudentTrackPage(),
                                   ),
                                 );
                               },

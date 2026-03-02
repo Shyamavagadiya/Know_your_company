@@ -15,6 +15,7 @@ import 'package:hcd_project2/students_details_page.dart';
 import 'package:hcd_project2/placement_history_page.dart';
 import 'package:hcd_project2/hod_round_results_page.dart';
 import 'package:hcd_project2/hod_company_registrations_page.dart';
+import 'package:hcd_project2/student_track_page.dart';
 
 // Page to display registered students for a company
 class RegisteredStudentsPage extends StatelessWidget {
@@ -990,6 +991,19 @@ class _PlacementCoordinatorDashboardState extends State<PlacementCoordinatorDash
                         context,
                         MaterialPageRoute(
                           builder: (context) => const StudentsDetailsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDashboardCard(
+                    'Particular Student Track',
+                    Icons.person_search,
+                    Colors.deepOrange,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const StudentTrackPage(),
                         ),
                       );
                     },
